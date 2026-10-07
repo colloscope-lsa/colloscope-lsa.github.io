@@ -421,7 +421,8 @@ var COLLES = (function () {
     reglages:     ["cle", "valeur"],
     ouvertures:   ["matiere", "lundi", "le", "par"],   // colles ouvertes à la main avant la date prévue
     fermetures:   ["debut", "fin", "motif"],           // vacances et jours fériés (modifiables dans le Sheet)
-    archives:     ["creneau", "matiere", "date", "heure", "classe", "eleve", "le"]  // inscriptions de plus de 3 semaines
+    archives:     ["creneau", "matiere", "date", "heure", "classe", "eleve", "le"], // inscriptions de plus de 3 semaines
+    avis:         ["le", "classe", "eleve", "matiere", "date", "heure"]   // colles annulées par la gestion, signalées à l'élève
   };
 
   var MAX_ECHECS = 10;
@@ -670,6 +671,9 @@ var COLLES = (function () {
   function journal(db, now, action, o, par) {
     db.ajouter("journal", { le: now.iso, action: action, classe: o.classe || "", matiere: o.matiere || "",
       date: o.date || "", heure: o.heure || "", eleve: o.eleve || "", par: par || "" });
+    // L'élève concerné le verra en arrivant sur le site (petit tableau à part : le journal n'est jamais relu côté élève)
+    if (action === "Annulée par la gestion" && o.eleve)
+      db.ajouter("avis", { le: now.iso, classe: o.classe || "", eleve: o.eleve, matiere: o.matiere || "", date: o.date || "", heure: o.heure || "" });
   }
 
   // Après une modification du planning : retire les inscriptions futures devenues invalides.
@@ -732,8 +736,8 @@ var COLLES = (function () {
           colleur: v.seance.colleur, info: m.info, passe: estPasse(i.date, i.heure, now) });
       });
       mes.sort(function (a, b) { return (a.date + a.debut) < (b.date + b.debut) ? -1 : 1; });
-      db.fin("journal", 500).forEach(function (j) {
-        if (j.action === "Annulée par la gestion" && j.classe === c.id && j.eleve === moi.nom && j.date >= now.date) {
+      db.t("avis").forEach(function (j) {
+        if (j.classe === c.id && j.eleve === moi.nom && j.date >= now.date) {
           var m = find(db.t("matieres"), function (x) { return x.id === j.matiere; });
           alertes.push({ matiereNom: m ? m.nom : "Colle", date: j.date, heure: j.heure, le: j.le });
         }
@@ -1096,6 +1100,8 @@ var COLLES = (function () {
   }
 
   function archiver(db, now) {
+    var av = db.t("avis");   // alertes dont la colle est passée : plus utiles
+    if (av.some(function (x) { return x.date < now.date; })) db.set("avis", av.filter(function (x) { return x.date >= now.date; }));
     var limite = addDays(now.date, -21), ins = db.t("inscriptions");
     var vieilles = ins.filter(function (i) { return i.date < limite; });
     if (vieilles.length < 40) return;
