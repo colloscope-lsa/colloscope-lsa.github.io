@@ -770,7 +770,7 @@ var COLLES = (function () {
     };
   }
 
-  /* ---------- Fichier agenda (.ics), servi par une vraie adresse pour l'iPhone ---------- */
+  /* ---------- Fichier agenda (.ics) : sans rappel imposé, chacun garde les réglages de son agenda ---------- */
   var LYCEE = "Lycée Sidoine Apollinaire";
   function icsTexte(c) {
     var dt = function (d, t) { return d.replace(/-/g, "") + "T" + t.replace(":", "") + "00"; };
@@ -791,7 +791,6 @@ var COLLES = (function () {
       "DTSTART;TZID=Europe/Paris:" + dt(c.date, c.debut),
       "DTEND;TZID=Europe/Paris:" + dt(c.date, c.fin),
       "SUMMARY:" + x(titre), "LOCATION:" + x(lieu), "DESCRIPTION:" + x(details),
-      "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + x(titre + " dans 1 heure"), "TRIGGER:-PT1H", "END:VALARM",
       "END:VEVENT", "END:VCALENDAR"
     ].map(plier).join("\r\n");
   }
@@ -1124,6 +1123,10 @@ var COLLES = (function () {
         case "gestion": r = gestion(db, p, now); break;
         default: throw err("Action inconnue.");
       }
+      // Après une réservation ou une annulation, on renvoie directement le nouvel état : un aller-retour de moins.
+      if (r && r.ok && (p.action === "reserver" || p.action === "annuler")) {
+        try { var et = etat(db, p, now); if (et && et.ok) r.etat = et; } catch (e2) { if (!(e2 && e2.utilisateur)) throw e2; }
+      }
       db.commit();
       return r;
     } catch (e) {
@@ -1238,7 +1241,6 @@ var ICON = {
   bas: I('<path d="M6 9l6 6 6-6"/>', 2),
   maj: I('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>'),
   agenda: I('<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
-  fichier: I('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 12v6M9.5 15.5L12 18l2.5-2.5"/>'),
   externe: I('<path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>'),
   info: I('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', 2),
   attention: I('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/>', 2),
@@ -1402,15 +1404,6 @@ function telechargerIcs(c) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
 }
-// Le fichier est servi par le serveur à une vraie adresse : c'est ce qui déclenche
-// la fenêtre « Ajouter au calendrier » sur iPhone (un lien data: est bloqué par Safari).
-function ajouterApple(c) {
-  if (DEMO) { toast("L'aperçu bloque l'ouverture du calendrier. Ça marchera sur le vrai site.", false); return; }
-  var url = CONFIG.API_URL + "?action=ics&c=" + encodeURIComponent(c.creneau) + "&app=" + encodeURIComponent(URL_SITE);
-  var w = null;
-  try { w = window.open(url, "_blank"); } catch (e) {}
-  if (!w) location.href = url;   // fenêtre bloquée : on ouvre dans la même page
-}
 function lienGoogle(c) {
   var dt = function (d, t) { return d.replace(/-/g, "") + "T" + t.replace(":", "") + "00"; };
   return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(titreEv(c)) +
@@ -1420,10 +1413,9 @@ function lienGoogle(c) {
 function feuilleAgenda(c) {
   ouvrirFeuille('<h3>Ajouter à mon agenda</h3><div class="resume"><span class="muet">' + esc(titreEv(c)) + ', ' + esc(dateLongue(c.date)) + ' à ' + hc(c.debut) + '</span></div>' +
     '<div class="choix">' +
-    '<button class="ligne" data-act="ag-apple" data-c="' + esc(c.creneau) + '">' + ICON.agenda + '<span class="corps"><span class="principal">Calendrier Apple</span><span class="secondaire">iPhone, iPad et Mac</span></span></button>' +
+    '<button class="ligne" data-act="ag-fichier" data-c="' + esc(c.creneau) + '">' + ICON.agenda + '<span class="corps"><span class="principal">Calendrier du téléphone</span><span class="secondaire">iPhone, Samsung et la plupart des agendas</span></span></button>' +
     '<a class="ligne" href="' + esc(lienGoogle(c)) + '" target="_blank" rel="noopener" data-act="fermer">' + ICON.externe + '<span class="corps"><span class="principal">Google Agenda</span><span class="secondaire">S\'ouvre dans un nouvel onglet</span></span></a>' +
-    '<button class="ligne" data-act="ag-fichier" data-c="' + esc(c.creneau) + '">' + ICON.fichier + '<span class="corps"><span class="principal">Samsung, Outlook ou autre</span><span class="secondaire">Télécharge un fichier .ics à ouvrir dans ton agenda</span></span></button>' +
-    '</div><p class="note">Un rappel est prévu une heure avant. Si ta colle change, mets aussi ton agenda à jour.</p>' +
+    '</div><p class="note">Si ta colle change, pense à mettre ton agenda à jour.</p>' +
     '<button class="btn plein discret" data-act="fermer">Fermer</button>', "Ajouter à mon agenda");
 }
 
@@ -1520,28 +1512,41 @@ function blocErreur(message, act) {
 }
 function chargerEtat(silencieux) {
   var p = S.profil;
-  return api({ action: "etat", classe: p.classe, code: p.code, eleve: p.eleve }).then(function (r) {
+  return api({ action: "etat", classe: p.classe, code: p.code, eleve: p.eleve }).then(function (r) { return appliquerEtat(r, silencieux); });
+}
+// Dernier état connu, gardé sur l'appareil : la page s'affiche tout de suite, puis se met à jour.
+var CLE_ETAT = "colloscope-etat-v1";
+function idProfil(p) { return p ? [p.classe, p.code, p.eleve].join("|") : ""; }
+function etatMemorise() {
+  if (DEMO || !profilComplet()) return null;
+  var m = LS.get(CLE_ETAT);
+  var frais = m && typeof m.le === "number" && Date.now() - m.le < 36 * 3600 * 1000;
+  return frais && m.id === idProfil(S.profil) && m.etat && m.etat.ok && m.etat.matieres ? m.etat : null;
+}
+function appliquerEtat(r, silencieux) {
+  {
     var demande = S.maj; S.maj = false;
     if (!r.ok && !S.etat && !/Code d'accès|Classe introuvable/.test(r.error)) { S.etatErreur = r.error; rendre(); return r; }
     S.etatErreur = "";
     if (!r.ok) {
       if (/Code d'accès|Classe introuvable/.test(r.error)) {
-        S.profil = null; LS.del(CLE_PROFIL);
+        S.profil = null; S.etat = null; LS.del(CLE_PROFIL); LS.del(CLE_ETAT);
         if (/Code d'accès/.test(r.error)) { LS.del(CLE_ACCES); toast("Le code d'accès a changé. Entre le nouveau code.", false); } else toast(r.error, false);
         S.ob = debutConnexion();
       }
       else if (!silencieux) toast(r.error, false);
       rendre(); return r;
     }
-    if (!r.moi) { S.profil = null; LS.del(CLE_PROFIL); toast("Ton nom n'est plus dans la liste de la classe.", false); rendre(); return r; }
+    if (!r.moi) { S.profil = null; S.etat = null; LS.del(CLE_PROFIL); LS.del(CLE_ETAT); toast("Ton nom n'est plus dans la liste de la classe.", false); rendre(); return r; }
     // Rafraîchissement automatique : on ne redessine que si quelque chose a changé
     var cle = function (x) { return x ? JSON.stringify(Object.assign({}, x, { maintenant: "" })) : ""; };
     var change = cle(r) !== cle(S.etat);
     S.etat = r;
+    if (!DEMO) LS.set(CLE_ETAT, { id: idProfil(S.profil), le: Date.now(), etat: r });
     if (r.classe && S.profil.classeNom !== r.classe.nom) { S.profil.classeNom = r.classe.nom; sauverProfil(); }
     if (change || !silencieux || demande) rendre();
     return r;
-  });
+  }
 }
 function actualiser() { S.maj = true; S.etatErreur = ""; rendre(); chargerEtat(); }
 function matiere(id) { return S.etat && S.etat.matieres.filter(function (m) { return m.id === id; })[0]; }
@@ -1816,7 +1821,7 @@ function cliqueCreneau(id) {
   feuilleConfirmer(ancien ? "Changer de créneau" : "Réserver ce créneau", corps, ancien ? "Changer de créneau" : "Réserver", false, function () {
     return actionEleve({ action: "reserver", creneau: id }).then(function (r) {
       if (!r.ok || r.interrompu) return r;
-      return chargerEtat().then(function () {
+      return (r.etat ? Promise.resolve(appliquerEtat(r.etat)) : chargerEtat()).then(function () {
         var c = maColle(id);
         if (!c) { fermerFeuille(); return; }
         fermerFeuille(); toast(ancien ? "Créneau changé" : "Inscription enregistrée");
@@ -1844,7 +1849,7 @@ function demanderAnnulation(id) {
       return actionEleve({ action: "annuler", creneau: id }).then(function (r) {
         if (!r.ok && /Inscription introuvable/.test(r.error)) { fermerFeuille(); toast("Cette colle était déjà annulée"); return chargerEtat(); }
         if (!r.ok || r.interrompu) return r;
-        fermerFeuille(); toast("Colle annulée"); return chargerEtat();
+        fermerFeuille(); toast("Colle annulée"); return r.etat ? appliquerEtat(r.etat) : chargerEtat();
       });
     });
 }
@@ -2216,7 +2221,7 @@ document.addEventListener("click", function (ev) {
     case "choix-colle": history.replaceState(null, "", "#" + d.h); rendre(); break;
     case "maj": actualiser(); break;
     case "profil": feuilleProfil(); break;
-    case "deconnexion": S.profil = null; LS.del(CLE_PROFIL); S.etat = null; S.vue = null; S.annuaire = null; S.recherche = ""; S.ob = debutConnexion(); fermerFeuille(); location.hash = ""; rendre(); break;
+    case "deconnexion": S.profil = null; LS.del(CLE_PROFIL); LS.del(CLE_ETAT); S.etat = null; S.vue = null; S.annuaire = null; S.recherche = ""; S.ob = debutConnexion(); fermerFeuille(); location.hash = ""; rendre(); break;
     case "reessayer-classes": S.ob.classes = null; S.ob.erreur = ""; rendre(); break;
     case "reessayer-etat": S.etatErreur = ""; rendre(); break;
     case "reessayer-gestion": S.gErreurReseau = ""; rendre(); break;
@@ -2235,7 +2240,6 @@ document.addEventListener("click", function (ev) {
     case "creneau": cliqueCreneau(d.id); break;
     case "ma-colle": feuilleMaColle(maColle(d.c)); break;
     case "agenda": var c = maColle(d.c); if (c) feuilleAgenda(c); break;
-    case "ag-apple": var c1 = maColle(d.c); if (c1) { fermerFeuille(); ajouterApple(c1); } break;
     case "ag-fichier": var c2 = maColle(d.c); if (c2) { fermerFeuille(); telechargerIcs(c2); } break;
     case "annuler": demanderAnnulation(d.c); break;
     case "vu": var vues = LS.get("colloscope-alertes-vues") || []; vues.push(d.k); LS.set("colloscope-alertes-vues", vues); rendre(); break;
@@ -2308,6 +2312,8 @@ document.addEventListener("visibilitychange", rafraichir);
 setInterval(rafraichir, 60000);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { ajusterSelect($("#sel-gm")); });
 
+S.etat = etatMemorise();
+if (S.etat) { S.maj = true; chargerEtat(true); }
 rendre();
 </script>
 
