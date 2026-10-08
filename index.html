@@ -128,6 +128,20 @@ body::before {
 .selecteur select:focus-visible { outline: 2px solid var(--bleu); outline-offset: 0; }
 .selecteur svg { position: absolute; right: 10px; width: 18px; height: 18px; color: var(--discret); pointer-events: none; }
 .pastille { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; background: var(--c, var(--discret)); }
+/* Espace gestion : matière puis classe, côte à côte */
+.selecteurs { display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; min-width: 0; }
+.selecteurs h1 { margin-right: 6px; }
+.selecteurs h1 + .selecteur, .selecteurs .selecteur + .selecteur { margin-left: 0; }
+.selecteur.classe select { color: var(--discret); }
+/* Programme et consignes d'une colle */
+.programme { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--trait); border-left: 2px solid var(--bleu); border-radius: var(--r); background: var(--surface); }
+.programme h2, .programme h4 { margin: 0; font-size: 13px; font-weight: 600; color: var(--encre-2); }
+.programme p { margin: 0; font-size: 14px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; color: var(--encre); }
+.programme-tete { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.programme.eleve { margin-top: 20px; }
+.ajout-programme { justify-self: start; display: block; text-align: left; font-size: 14px; font-weight: 500; color: var(--bleu); padding: 2px 0; }
+.ajout-programme span { color: var(--discret); font-weight: 400; }
+.ajout-programme:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---------- Listes ---------- */
 .liste { background: var(--surface); border: 1px solid var(--trait); border-radius: var(--r-l); overflow: hidden; }
@@ -180,7 +194,7 @@ button.ligne:active { background: var(--trait); }
 .siege.moi { background: var(--bleu); border-color: var(--bleu); }
 .creneau.inscrit { background: var(--bleu-pale); }
 .creneau.inscrit::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 2px; background: var(--bleu); }
-.creneau.complet .heure, .creneau.ferme .heure { color: var(--discret); }
+.creneau.complet .heure, .creneau.ferme .heure, .creneau.conflit .heure { color: var(--discret); }
 .creneau.passe { opacity: .45; }
 .annulee { padding: 16px; color: var(--rouge); font-size: 14px; }
 .meta-seance { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: -4px 0 0; font-size: 14px; color: var(--discret); }
@@ -363,6 +377,9 @@ input[type="search"].entree::-webkit-search-cancel-button { cursor: pointer; }
 .seance-g .entete { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; background: var(--survol); }
 .seance-g .entete b { font-weight: 500; font-size: 14px; }
 .seance-g .entete span { color: var(--discret); font-size: 13px; }
+.seance-g .entete .marque { color: var(--ambre); font-size: 12px; white-space: nowrap; }
+.seance-g .entete > span > b { color: var(--encre); }
+.seance-g .actions-seance { display: flex; gap: 6px; flex: none; }
 .rang { display: grid; grid-template-columns: 56px 1fr; gap: 12px; padding: 10px 16px; align-items: start; }
 .rang .h { font-weight: 500; font-variant-numeric: tabular-nums; padding-top: 4px; }
 .rang .noms { display: grid; gap: 2px; min-width: 0; }
@@ -412,9 +429,9 @@ var COLLES = (function () {
   var TABLES = {
     classes:      ["id", "nom", "code"],
     eleves:       ["classe", "nom", "pin", "echecs"],
-    matieres:     ["id", "classe", "nom", "couleur", "duree", "places", "info", "code"],
-    regles:       ["id", "matiere", "jour", "heures", "frequence", "debut", "fin", "salle", "colleur"],
-    ponctuels:    ["id", "matiere", "date", "heures", "salle", "colleur"],
+    matieres:     ["id", "classe", "nom", "couleur", "duree", "places", "info", "code", "periode", "ancrage"],  // periode : semaines par colle (2 = quinzaine)
+    regles:       ["id", "matiere", "jour", "heures", "frequence", "debut", "fin", "salle", "colleur", "duree", "places"],
+    ponctuels:    ["id", "matiere", "date", "heures", "salle", "colleur", "duree", "places"],
     annulations:  ["source", "date", "motif"],
     inscriptions: ["creneau", "matiere", "date", "heure", "classe", "eleve", "le"],
     journal:      ["le", "action", "classe", "matiere", "date", "heure", "eleve", "par"],
@@ -422,7 +439,10 @@ var COLLES = (function () {
     ouvertures:   ["matiere", "lundi", "le", "par"],   // colles ouvertes à la main avant la date prévue
     fermetures:   ["debut", "fin", "motif"],           // vacances et jours fériés (modifiables dans le Sheet)
     archives:     ["creneau", "matiere", "date", "heure", "classe", "eleve", "le"], // inscriptions de plus de 3 semaines
-    avis:         ["le", "classe", "eleve", "matiere", "date", "heure"]   // colles annulées par la gestion, signalées à l'élève
+    avis:         ["le", "classe", "eleve", "matiere", "date", "heure"],   // colles annulées par la gestion, signalées à l'élève
+    modifs:       ["source", "date", "heures", "duree", "places", "salle", "colleur", "le", "par"],   // une séance changée pour un jour seulement
+    details:      ["matiere", "lundi", "texte", "le", "par"],  // programme et consignes d'une colle, écrits par le prof
+    profs:        ["nom", "matieres", "code"]   // professeurs : nom, matières (« Économie » ou « Économie HEC2 »), code personnel
   };
 
   var MAX_ECHECS = 10;
@@ -506,8 +526,8 @@ var COLLES = (function () {
         var rows = store.loadTail ? store.loadTail(name, n) : (store.load(name) || []).slice(-n);
         return rows.map(function (r) { return ligneDe(name, r); }).concat(ajouts[name] || []).slice(-n);
       },
-      set: function (name, rows) { cache[name] = rows; dirty[name] = true; },
-      touch: function (name) { dirty[name] = true; },
+      set: function (name, rows) { cache[name] = rows; dirty[name] = true; this._per = null; },
+      touch: function (name) { dirty[name] = true; this._per = null; },
       // Ajout en fin de tableau, sans relire ni réécrire le reste (journal, archives)
       ajouter: function (name, row) { if (cache[name]) cache[name].push(row); (ajouts[name] = ajouts[name] || []).push(row); },
       reglage: function (cle, defaut) {
@@ -539,12 +559,21 @@ var COLLES = (function () {
   }
 
   // Séances d'une matière entre deux dates (incluses), triées.
+  // Chaque séance a sa durée et son nombre de places : séance modifiée ce jour-là > règle ou séance ponctuelle > matière.
   function seances(db, matiereId, de, a) {
     var out = [];
-    var annul = db.t("annulations");
+    var annul = db.t("annulations"), modifs = db.t("modifs");
+    var mat = find(db.t("matieres"), function (x) { return x.id === matiereId; }) || {};
+    var dureeM = +mat.duree || 40, placesM = placesDe(mat);
     function motifAnnul(source, date) {
       var x = find(annul, function (y) { return y.source === source && y.date === date; });
       return x ? (x.motif || "Séance annulée") : "";
+    }
+    function seance(type, src, date) {
+      var md = find(modifs, function (y) { return y.source === src.id && y.date === date; }) || {};
+      return { source: src.id, type: type, date: date, heures: parseHeures(md.heures || src.heures).heures,
+               duree: +md.duree || +src.duree || dureeM, places: Math.max(1, +md.places || +src.places || placesM),
+               salle: md.salle || src.salle, colleur: md.colleur || src.colleur, modifiee: !!md.source, annule: motifAnnul(src.id, date) };
     }
     db.t("regles").forEach(function (r) {
       if (r.matiere !== matiereId || !isDate(r.debut)) return;
@@ -556,14 +585,12 @@ var COLLES = (function () {
         var date = addDays(w, jour - 1);
         if (date < de || date > a || date < lundi(r.debut) || (r.fin && date > r.fin)) continue;
         if (fermeDans(db.fermetures(), date)) continue;
-        out.push({ source: r.id, type: "regle", date: date, heures: parseHeures(r.heures).heures,
-                   salle: r.salle, colleur: r.colleur, annule: motifAnnul(r.id, date) });
+        out.push(seance("regle", r, date));
       }
     });
     db.t("ponctuels").forEach(function (p) {
       if (p.matiere !== matiereId || p.date < de || p.date > a) return;
-      out.push({ source: p.id, type: "ponctuel", date: p.date, heures: parseHeures(p.heures).heures,
-                 salle: p.salle, colleur: p.colleur, annule: motifAnnul(p.id, p.date) });
+      out.push(seance("ponctuel", p, p.date));
     });
     out.sort(function (x, y) {
       if (x.date !== y.date) return x.date < y.date ? -1 : 1;
@@ -571,6 +598,11 @@ var COLLES = (function () {
       return hx < hy ? -1 : hx > hy ? 1 : 0;
     });
     return out;
+  }
+  // Programme et consignes d'une colle (une semaine d'une matière)
+  function detailDe(db, matiereId, lun) {
+    var d = find(db.t("details"), function (x) { return x.matiere === matiereId && x.lundi === lun; });
+    return d ? d.texte : "";
   }
 
   function idCreneau(source, date, heure) { return source + "~" + date + "~" + heure; }
@@ -595,16 +627,74 @@ var COLLES = (function () {
   var SEMAINES_AFFICHEES = 12;
   function placesDe(m) { return Math.max(1, +m.places || 2); }
 
-  // Séances d'une matière regroupées par semaine et numérotées (Colle 1, 2, 3…) depuis la rentrée.
-  function semainesDe(db, matiereId, de, a) {
-    var tout = seances(db, matiereId, db.reglage("debut_annee", "2026-09-01"), a);
-    var out = [], parLundi = {};
-    tout.forEach(function (s) {
-      var l = lundi(s.date);
-      if (!parLundi[l]) { parLundi[l] = { num: out.length + 1, lundi: l, seances: [] }; out.push(parLundi[l]); }
-      parLundi[l].seances.push(s);
+  /* ---------- Colles sur plusieurs semaines (quinzaine…) ---------- */
+  // Une semaine compte si au moins un jour du lundi au vendredi n'est pas fermé : les vacances ne comptent pas.
+  function semaineDeCours(db, lun) {
+    for (var i = 0; i < 5; i++) if (!fermeDans(db.fermetures(), addDays(lun, i))) return true;
+    return false;
+  }
+  function semainesParColle(m) { return Math.max(1, Math.min(4, +(m && m.periode) || 1)); }
+  // Semaine où commence une colle : réglée par le prof, sinon la première semaine de ses colles régulières
+  function ancrageDe(db, m) {
+    if (isDate(m.ancrage)) return lundi(m.ancrage);
+    var debuts = db.t("regles").filter(function (r) { return r.matiere === m.id && isDate(r.debut); }).map(function (r) { return r.debut; }).sort();
+    return lundi(debuts[0] || db.reglage("debut_annee", "2026-09-01"));
+  }
+  // Clé d'une colle = lundi de sa première semaine. Une semaine de vacances rejoint la colle de la semaine de cours d'avant.
+  function periodeDe(db, m, date) {
+    var w = lundi(date), P = semainesParColle(m);
+    if (P === 1) return w;
+    var memo = db._per || (db._per = {}), t = memo[m.id];
+    if (!t) {
+      var A = ancrageDe(db, m), liste = [], depart = addDays(A, -7 * 70);
+      for (var i = 0; i < 140; i++) { var l = addDays(depart, 7 * i); if (semaineDeCours(db, l)) liste.push(l); }
+      var zero = 0;
+      while (zero < liste.length && liste[zero] < A) zero++;
+      t = memo[m.id] = { liste: liste, zero: zero, P: P, vu: {} };
+    }
+    if (t.vu[w]) return t.vu[w];
+    var pos = -1;
+    for (var j = 0; j < t.liste.length && t.liste[j] <= w; j++) pos = j;
+    if (pos < 0) return (t.vu[w] = w);
+    var premiere = t.zero + Math.floor((pos - t.zero) / t.P) * t.P;
+    return (t.vu[w] = premiere >= 0 && premiere < t.liste.length ? t.liste[premiere] : w);
+  }
+  function matiereParId(db, id) { return find(db.t("matieres"), function (x) { return x.id === id; }); }
+  // « 17h », « 17h40 » ; « d'Économie », « de Droit »
+  function heureFr(t) { var p = String(t).split(":"); return (+p[0]) + "h" + (p[1] === "00" ? "" : p[1]); }
+  function deMatiere(nom) { return (/^[aeiouyàâäéèêëîïôöùûüh]/i.test(nom) ? "d'" : "de ") + nom; }
+  // Colles d'un élève (toutes matières) : pour refuser deux colles qui se chevauchent
+  function collesDeLeleve(db, classe, nom, depuis) {
+    var out = [];
+    db.t("inscriptions").forEach(function (i) {
+      if (i.classe !== classe || i.eleve !== nom || i.date < depuis) return;
+      var v = creneauValide(db, i.creneau), m = matiereParId(db, i.matiere);
+      if (!v || !m) return;
+      out.push({ creneau: i.creneau, date: i.date, debut: toMin(i.heure), fin: toMin(i.heure) + v.seance.duree, matiere: m.id, nom: m.nom, cle: periodeDe(db, m, i.date) });
     });
-    return out.filter(function (w) { return w.lundi >= lundi(de); });
+    return out;
+  }
+  // Une autre colle de l'élève qui chevauche ce créneau (enchaîner 17h–17h40 puis 17h40 est permis)
+  function chevauchement(miennes, matiereId, cle, date, debut, duree) {
+    var d = toMin(debut), f = d + duree;
+    return find(miennes, function (x) { return x.date === date && !(x.matiere === matiereId && x.cle === cle) && d < x.fin && x.debut < f; });
+  }
+  function messageChevauchement(x) {
+    return "Tu as déjà une colle " + deMatiere(x.nom) + " de " + heureFr(fromMin(x.debut)) + " à " + heureFr(fromMin(x.fin)) + " ce jour-là. Choisis un créneau qui ne la chevauche pas.";
+  }
+
+  // Séances d'une matière regroupées par colle (une semaine, ou plusieurs) et numérotées (Colle 1, 2, 3…) depuis la rentrée.
+  function semainesDe(db, matiereId, de, a) {
+    var m = matiereParId(db, matiereId);
+    var tout = seances(db, matiereId, db.reglage("debut_annee", "2026-09-01"), a);
+    var out = [], parCle = {};
+    tout.forEach(function (s) {
+      var l = periodeDe(db, m, s.date);
+      if (!parCle[l]) { parCle[l] = { num: out.length + 1, lundi: l, seances: [] }; out.push(parCle[l]); }
+      parCle[l].seances.push(s);
+    });
+    var lde = lundi(de);
+    return out.filter(function (w) { return w.seances[w.seances.length - 1].date >= lde; });
   }
   function inscritsParCreneau(db) {
     var m = {};
@@ -655,13 +745,45 @@ var COLLES = (function () {
     if (e.echecs !== "0") { e.echecs = "0"; db.touch("eleves"); }
     return true;
   }
+  /* ---------- Professeurs : un nom, un code personnel, leurs matières ---------- */
+  function normNom(t) { return str(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " "); }
+  // « Économie » = l'économie de toutes les classes ; « Économie HEC2 » = une seule classe
+  function matieresDuProf(db, pr) {
+    var ids = [];
+    str(pr.matieres).split(/\s*[,;\/]\s*/).map(normNom).filter(Boolean).forEach(function (x) {
+      db.t("matieres").forEach(function (m) {
+        var cl = find(db.t("classes"), function (c) { return c.id === m.classe; });
+        if ((normNom(m.nom) === x || (cl && normNom(m.nom + " " + cl.nom) === x)) && ids.indexOf(m.id) < 0) ids.push(m.id);
+      });
+    });
+    return ids;
+  }
+  var ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  function codeAuHasard(n) { var c = ""; for (var i = 0; i < n; i++) c += ALPHABET.charAt(Math.floor(Math.random() * ALPHABET.length)); return c; }
+  // Code personnel d'un prof : 8 caractères, différent de tous les autres codes
+  function nouveauCodeProf(db, liste) {
+    var pris = {};
+    [db.reglage("code_admin", ""), db.reglage("code_acces", "")]
+      .concat(db.t("matieres").map(function (m) { return m.code; }), db.t("profs").map(function (x) { return x.code; }), (liste || []).map(function (x) { return x.code; }))
+      .forEach(function (c) { if (c) pris[String(c).toUpperCase()] = 1; });
+    var c;
+    do { c = codeAuHasard(8); } while (pris[c]);
+    return c;
+  }
+  function profParCode(db, code) {
+    return code ? find(db.t("profs"), function (x) { return x.code && x.code.toUpperCase() === code; }) : null;
+  }
   function gestionAuth(db, p) {
     var code = str(p.gcode).toUpperCase();
     if (!code) throw err("Code de gestion requis.");
     var admin = code === String(db.reglage("code_admin", "")).toUpperCase();
     var ids = db.t("matieres").filter(function (m) { return admin || (m.code && m.code.toUpperCase() === code); }).map(function (m) { return m.id; });
-    if (!admin && !ids.length) throw err("Code incorrect.");
-    return { admin: admin, matieres: ids };
+    if (admin || ids.length) return { admin: admin, matieres: ids };
+    var pr = profParCode(db, code);
+    if (!pr) throw err("Code incorrect.");
+    var mp = matieresDuProf(db, pr);
+    if (!mp.length) throw err("Code reconnu, mais aucune matière n'est associée à " + pr.nom + ". L'administrateur doit compléter la liste des professeurs.");
+    return { admin: false, matieres: mp, prof: pr.nom };
   }
   function exigerMatiere(scope, id) {
     if (scope.matieres.indexOf(id) < 0) throw err("Cette matière n'est pas accessible avec ce code.");
@@ -697,31 +819,36 @@ var COLLES = (function () {
     var moi = nom ? find(db.t("eleves"), function (e) { return e.classe === c.id && e.nom === nom; }) : null;
     var fin = addDays(now.date, 7 * SEMAINES_AFFICHEES);
     var parCreneau = inscritsParCreneau(db);
+    var miennes = moi ? collesDeLeleve(db, c.id, moi.nom, now.date) : [];
     var matieres = db.t("matieres").filter(function (m) { return m.classe === c.id; }).map(function (m) {
       var duree = +m.duree || 40, places = placesDe(m);
       var semaines = semainesDe(db, m.id, db.reglage("debut_annee", "2026-09-01"), fin).map(function (w) {
         var ouvert = estOuvert(db, m.id, w.lundi, now), mien = null, libres = 0, toutFini = true;
         var ss = w.seances.map(function (s) {
           return {
-            source: s.source, date: s.date, salle: s.salle, colleur: s.colleur, annule: s.annule,
+            source: s.source, date: s.date, salle: s.salle, colleur: s.colleur, annule: s.annule, duree: s.duree, places: s.places,
             creneaux: s.heures.map(function (h) {
               var id = idCreneau(s.source, s.date, h), qui = parCreneau[id] || [];
               var estMoi = moi && qui.some(function (i) { return i.eleve === moi.nom && i.classe === c.id; });
-              var passe = estPasse(s.date, h, now), reste = Math.max(0, places - qui.length);
+              var passe = estPasse(s.date, h, now), reste = Math.max(0, s.places - qui.length);
               var etat = s.annule ? "annule" : estMoi ? "moi" : passe ? "passe" : reste ? "libre" : "complet";
+              var conflit = etat === "libre" ? chevauchement(miennes, m.id, w.lundi, s.date, h, s.duree) : null;
+              if (conflit) etat = "conflit";
               if (estMoi) mien = { creneau: id, date: s.date, debut: h };
               if (!s.annule && !passe) { toutFini = false; libres += reste; }
-              return { id: id, debut: h, fin: fromMin(toMin(h) + duree), places: places, restantes: reste, etat: etat,
+              var cr = { id: id, debut: h, fin: fromMin(toMin(h) + s.duree), places: s.places, restantes: reste, etat: etat,
                        noms: qui.map(function (i) { return i.eleve; }) };
+              if (conflit) cr.conflit = messageChevauchement(conflit);
+              return cr;
             })
           };
         });
         return {
-          num: w.num, lundi: w.lundi, seances: ss, ouvert: ouvert, ouverture: ouverture(db, w.lundi),
+          num: w.num, lundi: w.lundi, seances: ss, ouvert: ouvert, ouverture: ouverture(db, w.lundi), detail: detailDe(db, m.id, w.lundi),
           termine: toutFini, annulee: ss.every(function (s) { return s.annule; }), libres: ouvert ? libres : 0, moi: mien
         };
       });
-      return { id: m.id, nom: m.nom, couleur: m.couleur, info: m.info, duree: duree, places: places, semaines: semaines };
+      return { id: m.id, nom: m.nom, couleur: m.couleur, info: m.info, duree: duree, places: places, periode: semainesParColle(m), semaines: semaines };
     });
     var mes = [], alertes = [];
     if (moi) {
@@ -732,8 +859,8 @@ var COLLES = (function () {
         if (!v || !m) return;
         var w = find(semainesDe(db, m.id, i.date, i.date), function () { return true; });
         mes.push({ creneau: i.creneau, matiere: m.id, matiereNom: m.nom, couleur: m.couleur, num: w ? w.num : "", date: i.date,
-          debut: i.heure, fin: fromMin(toMin(i.heure) + (+m.duree || 40)), salle: v.seance.salle,
-          colleur: v.seance.colleur, info: m.info, passe: estPasse(i.date, i.heure, now) });
+          debut: i.heure, fin: fromMin(toMin(i.heure) + v.seance.duree), salle: v.seance.salle,
+          colleur: v.seance.colleur, info: m.info, lundi: w ? w.lundi : lundi(i.date), detail: detailDe(db, m.id, periodeDe(db, m, i.date)), passe: estPasse(i.date, i.heure, now) });
       });
       mes.sort(function (a, b) { return (a.date + a.debut) < (b.date + b.debut) ? -1 : 1; });
       db.t("avis").forEach(function (j) {
@@ -763,7 +890,7 @@ var COLLES = (function () {
       var m = mats[i.matiere], v = m && creneauValide(db, i.creneau);
       if (!v) return;
       colles.push({ nom: i.eleve, classe: i.classe, matiere: m.nom, couleur: m.couleur, date: i.date, debut: i.heure,
-        fin: fromMin(toMin(i.heure) + (+m.duree || 40)), salle: v.seance.salle, colleur: v.seance.colleur });
+        fin: fromMin(toMin(i.heure) + v.seance.duree), salle: v.seance.salle, colleur: v.seance.colleur });
     });
     colles.sort(function (a, b) { return (a.date + a.debut) < (b.date + b.debut) ? -1 : 1; });
     return {
@@ -781,7 +908,7 @@ var COLLES = (function () {
     var x = function (t) { return String(t).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n"); };
     var titre = "Colle de " + c.matiereNom + (c.num ? " (colle " + c.num + ")" : "");
     var lieu = c.salle ? "Salle " + c.salle + ", " + LYCEE : LYCEE;
-    var details = [c.info, c.colleur ? "Colleur : " + c.colleur : "", c.url ? "En cas de changement, le Colloscope fait foi : " + c.url : ""].filter(Boolean).join("\n");
+    var details = [c.info, c.detail ? "Programme : " + c.detail : "", c.colleur ? "Colleur : " + c.colleur : "", c.url ? "En cas de changement, le Colloscope fait foi : " + c.url : ""].filter(Boolean).join("\n");
     var stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
     return [
       "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Colloscope//FR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
@@ -816,7 +943,8 @@ var COLLES = (function () {
     if (!m) throw err("Ce créneau n'existe plus.");
     var w = find(semainesDe(db, m.id, v.date, v.date), function () { return true; });
     return { ok: true, ics: icsTexte({ creneau: str(p.c), matiereNom: m.nom, num: w ? w.num : "", date: v.date, debut: v.heure,
-      fin: fromMin(toMin(v.heure) + (+m.duree || 40)), salle: v.seance.salle, colleur: v.seance.colleur, info: m.info, url: str(p.app) }) };
+      fin: fromMin(toMin(v.heure) + v.seance.duree), salle: v.seance.salle, colleur: v.seance.colleur, info: m.info,
+      detail: detailDe(db, m.id, periodeDe(db, m, v.date)), url: str(p.app) }) };
   }
 
   /* ---------- Consultation d'une autre classe (lecture seule) ---------- */
@@ -832,16 +960,16 @@ var COLLES = (function () {
         semaines: semainesDe(db, m.id, now.date, fin).map(function (w) {
           var fini = true;
           var ss = w.seances.map(function (s) {
-            return { date: s.date, salle: s.salle, colleur: s.colleur, annule: s.annule,
+            return { date: s.date, salle: s.salle, colleur: s.colleur, annule: s.annule, duree: s.duree, places: s.places,
               creneaux: s.heures.map(function (h) {
                 var passe = estPasse(s.date, h, now);
                 if (!passe && !s.annule) fini = false;
-                return { debut: h, fin: fromMin(toMin(h) + duree), passe: passe,
+                return { debut: h, fin: fromMin(toMin(h) + s.duree), passe: passe,
                   noms: (parCreneau[idCreneau(s.source, s.date, h)] || []).map(function (i) { return i.eleve; }) };
               }) };
           });
           return { num: w.num, lundi: w.lundi, ouvert: estOuvert(db, m.id, w.lundi, now), ouverture: ouverture(db, w.lundi),
-            termine: fini, annulee: ss.every(function (s) { return s.annule; }), seances: ss };
+            termine: fini, annulee: ss.every(function (s) { return s.annule; }), seances: ss, detail: detailDe(db, m.id, w.lundi) };
         })
       };
     });
@@ -856,23 +984,27 @@ var COLLES = (function () {
     var m = find(db.t("matieres"), function (x) { return x.id === v.matiere; });
     if (!m || m.classe !== c.id) throw err("Ce créneau ne concerne pas ta classe.");
     if (estPasse(v.date, v.heure, now)) throw err("Ce créneau est déjà passé.");
-    if (!estOuvert(db, v.matiere, lundi(v.date), now)) {
-      var o = ouverture(db, lundi(v.date));
+    var sem = periodeDe(db, m, v.date), ancienne = null;
+    if (!estOuvert(db, v.matiere, sem, now)) {
+      var o = ouverture(db, sem);
       throw err("Les inscriptions pour cette colle ouvrent le " + o.date.split("-").reverse().join("/") + " à " + o.heure.replace(":", "h") + ".");
     }
     var ins = db.t("inscriptions");
     var deja = ins.filter(function (i) { return i.creneau === idc; });
     if (deja.some(function (i) { return i.eleve === e.nom && i.classe === c.id; })) return { ok: true };
-    if (deja.length >= placesDe(m)) throw err("Trop tard : ce créneau vient d'être complété.");
-    // Une colle par matière et par semaine : l'ancienne est remplacée.
-    var sem = lundi(v.date), ancienne = null;
+    if (deja.length >= v.seance.places) throw err("Trop tard : ce créneau vient d'être complété.");
+    // Une colle par matière et par période (semaine, ou quinzaine…) : l'ancienne est remplacée.
     var garde = ins.filter(function (i) {
-      var meme = i.classe === c.id && i.eleve === e.nom && i.matiere === m.id && lundi(i.date) === sem;
+      var meme = i.classe === c.id && i.eleve === e.nom && i.matiere === m.id && periodeDe(db, m, i.date) === sem;
       if (meme && !estPasse(i.date, i.heure, now)) { ancienne = i; return false; }
       return true;
     });
-    if (find(garde, function (i) { return i.classe === c.id && i.eleve === e.nom && i.matiere === m.id && lundi(i.date) === sem; }))
-      throw err("Tu as déjà passé ta colle de " + m.nom + " cette semaine.");
+    if (find(garde, function (i) { return i.classe === c.id && i.eleve === e.nom && i.matiere === m.id && periodeDe(db, m, i.date) === sem; }))
+      throw err("Tu as déjà passé ta colle " + deMatiere(m.nom) + (semainesParColle(m) > 1 ? " pour cette période." : " cette semaine."));
+    // Pas deux colles en même temps, même en partie
+    var conflit = chevauchement(collesDeLeleve(db, c.id, e.nom, v.date).filter(function (x) { return !ancienne || x.creneau !== ancienne.creneau; }),
+      m.id, sem, v.date, v.heure, v.seance.duree);
+    if (conflit) throw err(messageChevauchement(conflit));
     garde.push({ creneau: idc, matiere: m.id, date: v.date, heure: v.heure, classe: c.id, eleve: e.nom, le: now.iso });
     db.set("inscriptions", garde);
     journal(db, now, ancienne ? "Modification" : "Inscription",
@@ -913,25 +1045,26 @@ var COLLES = (function () {
       var tous = db.t("eleves").filter(function (e) { return e.classe === m.classe; }).map(function (e) { return e.nom; });
       return {
         id: m.id, classe: m.classe, nom: m.nom, couleur: m.couleur, duree: duree, places: placesDe(m), info: m.info,
-        code: scope.admin ? m.code : undefined,
+        code: scope.admin ? m.code : undefined, periode: semainesParColle(m), ancrage: ancrageDe(db, m),
         semaines: semainesDe(db, m.id, addDays(now.date, -7), fin).map(function (w) {
           var inscrits = {};
           var ss = w.seances.map(function (s) {
             return { source: s.source, type: s.type, date: s.date, salle: s.salle, colleur: s.colleur, annule: s.annule,
+              duree: s.duree, places: s.places, modifiee: s.modifiee,
               creneaux: s.heures.map(function (h) {
                 var id = idCreneau(s.source, s.date, h);
                 var noms = (parCreneau[id] || []).map(function (i) { inscrits[i.eleve] = 1; return i.eleve; });
-                return { id: id, debut: h, fin: fromMin(toMin(h) + duree), eleves: noms };
+                return { id: id, debut: h, fin: fromMin(toMin(h) + s.duree), eleves: noms };
               }) };
           });
-          return { num: w.num, lundi: w.lundi, ouverture: ouverture(db, w.lundi), ouvert: estOuvert(db, m.id, w.lundi, now),
+          return { num: w.num, lundi: w.lundi, ouverture: ouverture(db, w.lundi), ouvert: estOuvert(db, m.id, w.lundi, now), detail: detailDe(db, m.id, w.lundi),
             aLaMain: ouverteALaMain(db, m.id, w.lundi), termine: ss.every(function (s) { return s.annule || s.creneaux.every(function (c) { return estPasse(s.date, c.debut, now); }); }), seances: ss,
             manquants: ss.every(function (s) { return s.annule; }) ? [] : tous.filter(function (n) { return !inscrits[n]; }).sort(function (a, b) { return a.localeCompare(b, "fr"); }) };
         })
       };
     });
     var out = {
-      ok: true, admin: scope.admin, aujourdhui: now.date, classes: classes, matieres: matieres,
+      ok: true, admin: scope.admin, prof: scope.prof || "", aujourdhui: now.date, classes: classes, matieres: matieres,
       regles: db.t("regles").filter(dans), ponctuels: db.t("ponctuels").filter(dans),
       journal: db.fin("journal", 2000).filter(function (j) { return scope.admin || scope.matieres.indexOf(j.matiere) >= 0; }).slice(-200).reverse()
     };
@@ -940,6 +1073,7 @@ var COLLES = (function () {
         return { classe: e.classe, nom: e.nom, aCode: !!e.pin, bloque: +e.echecs >= MAX_ECHECS };
       });
       out.fermetures = db.fermetures().map(function (f) { return { debut: f[0], fin: f[1], motif: f[2] }; });
+      out.profs = db.t("profs").map(function (x) { return { nom: x.nom, matieres: x.matieres, code: x.code, acces: matieresDuProf(db, x).length }; });
       out.reglages = { code_acces: db.reglage("code_acces", ""), ouverture_jours: db.reglage("ouverture_jours", "14"), ouverture_heure: db.reglage("ouverture_heure", "12:00"), debut_annee: db.reglage("debut_annee", "2026-09-01") };
     }
     return out;
@@ -959,6 +1093,26 @@ var COLLES = (function () {
     return h.heures.join(", ");
   }
 
+  // Nombre facultatif : vide = valeur habituelle
+  function entierOuVide(v, min, max, msg) {
+    var t = str(v).trim();
+    if (t === "") return "";
+    if (!/^\d{1,3}$/.test(t) || +t < min || +t > max) throw err(msg);
+    return String(+t);
+  }
+  var ERR_DUREE = "Durée invalide (5 à 240 minutes).", ERR_PLACES = "Nombre d'élèves par créneau invalide (1 à 10).";
+  function dureePlaces(o) {
+    if (o.duree !== undefined) o.duree = entierOuVide(o.duree, 5, 240, ERR_DUREE);
+    if (o.places !== undefined) o.places = entierOuVide(o.places, 1, 10, ERR_PLACES);
+  }
+  function verifierCodeGestion(db, code) {
+    if (!/^[A-Za-z0-9]{4,20}$/.test(code)) throw err("Le code doit faire de 4 à 20 lettres ou chiffres, sans espace.");
+    var C = code.toUpperCase();
+    if (C === String(db.reglage("code_admin", "")).toUpperCase()) throw err("Ce code est déjà le code administrateur.");
+    if (C === String(db.reglage("code_acces", "")).toUpperCase()) throw err("Ce code est le code d'accès des élèves : choisis-en un autre, sinon tous les élèves pourraient gérer la matière.");
+    if (profParCode(db, C)) throw err("Ce code est déjà le code personnel d'un professeur.");
+  }
+
   function upsert(db, table, row, cols) {
     var rows = db.t(table);
     var ex = row.id ? find(rows, function (x) { return x.id === row.id; }) : null;
@@ -969,7 +1123,7 @@ var COLLES = (function () {
   }
 
   function gestion(db, p, now) {
-    var scope = gestionAuth(db, p), par = scope.admin ? "admin" : "gestion";
+    var scope = gestionAuth(db, p), par = scope.admin ? "admin" : (scope.prof || "gestion");
     var a = str(p.op), o = p.data || {};
     var res = { ok: true };
 
@@ -978,6 +1132,7 @@ var COLLES = (function () {
       if (exR) exigerMatiere(scope, exR.matiere);
       exigerMatiere(scope, str(o.matiere));
       o.heures = validerSource(o, true);
+      dureePlaces(o);
       res.id = upsert(db, "regles", o, TABLES.regles).id;
     } else if (a === "regle_suppr" || a === "ponctuel_suppr") {
       var table = a === "regle_suppr" ? "regles" : "ponctuels";
@@ -986,11 +1141,13 @@ var COLLES = (function () {
       exigerMatiere(scope, r.matiere);
       db.set(table, db.t(table).filter(function (x) { return x !== r; }));
       db.set("annulations", db.t("annulations").filter(function (x) { return x.source !== r.id; }));
+      db.set("modifs", db.t("modifs").filter(function (x) { return x.source !== r.id; }));
     } else if (a === "ponctuel") {
       var exP = o.id ? find(db.t("ponctuels"), function (x) { return x.id === o.id; }) : null;
       if (exP) exigerMatiere(scope, exP.matiere);
       exigerMatiere(scope, str(o.matiere));
       o.heures = validerSource(o, false);
+      dureePlaces(o);
       res.id = upsert(db, "ponctuels", o, TABLES.ponctuels).id;
     } else if (a === "annulation") {
       var m = matiereDeSource(db, str(o.source));
@@ -1034,6 +1191,117 @@ var COLLES = (function () {
         db.set(t, db.t(t).filter(function (x) { if (x.matiere === mid) { gone[x.id] = 1; return false; } return true; }));
       });
       db.set("annulations", db.t("annulations").filter(function (x) { return !gone[x.source]; }));
+      db.set("modifs", db.t("modifs").filter(function (x) { return !gone[x.source]; }));
+      db.set("details", db.t("details").filter(function (x) { return x.matiere !== mid; }));
+    } else if (a === "matiere_params") {
+      // Durée, élèves par créneau et précisions : chaque prof règle sa matière
+      var mp = find(db.t("matieres"), function (x) { return x.id === str(o.id); });
+      if (!mp) throw err("Matière introuvable.");
+      exigerMatiere(scope, mp.id);
+      var dP = entierOuVide(o.duree, 5, 240, ERR_DUREE), pP = entierOuVide(o.places, 1, 10, ERR_PLACES);
+      if (dP) mp.duree = dP;
+      if (pP) mp.places = pP;
+      if (o.periode !== undefined && str(o.periode) !== "") {
+        if ([1, 2, 3, 4].indexOf(+o.periode) < 0) throw err("Durée d'une colle invalide (1 à 4 semaines).");
+        mp.periode = String(+o.periode);
+      }
+      if (o.ancrage !== undefined) {
+        if (str(o.ancrage) && !isDate(str(o.ancrage))) throw err("Date invalide.");
+        mp.ancrage = str(o.ancrage) ? lundi(str(o.ancrage)) : "";
+      }
+      if (o.info !== undefined) {
+        if (str(o.info).length > 300) throw err("Précision trop longue (300 caractères au plus).");
+        mp.info = str(o.info).trim();
+      }
+      db.touch("matieres");
+    } else if (a === "profs") {
+      // Liste des professeurs : « NOM Prénom : Matière, Matière » ; les codes déjà donnés sont gardés
+      exigerAdmin(scope);
+      var anciensP = db.t("profs"), listeP = [], vusP = {};
+      String(o.texte || "").split(/\n+/).forEach(function (l, k) {
+        l = l.replace(/^[*\-•\s]+/, "").trim();
+        if (!l) return;
+        var mL = l.match(/^(.*?)\s*(?::|–|—|\s-\s)\s*(.*)$/) || l.match(/^(.*?)\s*\((.*)\)\s*$/);
+        var nomP = (mL ? mL[1] : l).replace(/\s+/g, " ").trim(), mats = (mL ? mL[2] : "").split(/\s*[,;\/]\s*/).map(function (x) { return x.trim(); }).filter(Boolean);
+        if (!nomP) return;
+        if (vusP[normNom(nomP)]) throw err("« " + nomP + " » apparaît deux fois.");
+        vusP[normNom(nomP)] = 1;
+        mats.forEach(function (x) {
+          if (!matieresDuProf(db, { matieres: x }).length) {
+            var connues = db.t("matieres").map(function (m) { return m.nom; }).filter(function (n, i, arr) { return arr.indexOf(n) === i; });
+            throw err("Ligne " + (k + 1) + " : matière inconnue « " + x + " ». Matières possibles : " + connues.join(", ") + ".");
+          }
+        });
+        var exP = find(anciensP, function (x) { return normNom(x.nom) === normNom(nomP); });
+        listeP.push({ nom: nomP, matieres: mats.join(", "), code: exP && exP.code ? exP.code : "" });
+      });
+      listeP.forEach(function (x) { if (!x.code) x.code = nouveauCodeProf(db, listeP); });
+      db.set("profs", listeP);
+      res.nombre = listeP.length;
+      res.ajoutes = listeP.filter(function (x) { return !find(anciensP, function (y) { return normNom(y.nom) === normNom(x.nom); }); }).length;
+      res.retires = anciensP.filter(function (y) { return !find(listeP, function (x) { return normNom(y.nom) === normNom(x.nom); }); }).length;
+    } else if (a === "prof_code") {
+      exigerAdmin(scope);
+      var pc = find(db.t("profs"), function (x) { return x.nom === str(o.nom); });
+      if (!pc) throw err("Professeur introuvable.");
+      pc.code = nouveauCodeProf(db);
+      db.touch("profs");
+      res.code = pc.code;
+    } else if (a === "code_matiere") {
+      // Un code par matière, le même dans toutes les classes (un prof = un code)
+      exigerAdmin(scope);
+      var cibles = db.t("matieres").filter(function (x) { return x.nom === str(o.nom); });
+      if (!cibles.length) throw err("Matière introuvable.");
+      var codeN = str(o.code).trim();
+      verifierCodeGestion(db, codeN);
+      cibles.forEach(function (x) { x.code = codeN; });
+      db.touch("matieres");
+      res.nombre = cibles.length;
+    } else if (a === "codes_unifier") {
+      // Chaque matière prend, dans toutes les classes, le code qu'elle a dans la classe choisie
+      exigerAdmin(scope);
+      var garde = str(o.classe), changes = 0;
+      if (!find(db.t("classes"), function (c) { return c.id === garde; })) throw err("Classe inconnue.");
+      db.t("matieres").forEach(function (x) {
+        if (x.classe === garde) return;
+        var ref = find(db.t("matieres"), function (y) { return y.classe === garde && y.nom === x.nom && y.code; });
+        if (ref && x.code !== ref.code) { x.code = ref.code; changes++; }
+      });
+      if (changes) db.touch("matieres");
+      res.nombre = changes;
+    } else if (a === "seance_modif") {
+      // Une séance changée pour un jour seulement (horaires, durée, places, colleur, salle)
+      var srcM = str(o.source), dateM = str(o.date), mM = matiereDeSource(db, srcM);
+      if (!mM) throw err("Séance introuvable.");
+      exigerMatiere(scope, mM);
+      if (!isDate(dateM)) throw err("Date invalide.");
+      var autresModifs = db.t("modifs").filter(function (x) { return !(x.source === srcM && x.date === dateM); });
+      db.set("modifs", autresModifs);   // on repart de la séance habituelle
+      var base = find(seances(db, mM, dateM, dateM), function (x) { return x.source === srcM; });
+      if (!base) throw err("Pas de séance ce jour-là.");
+      var mmM = find(db.t("matieres"), function (x) { return x.id === mM; });
+      if (!o.retablir) {
+        var hM = parseHeures(o.heures);
+        if (hM.invalides.length) throw err("Heure non reconnue : « " + hM.invalides[0] + " ». Exemple : 12h, 12h20, 16h.");
+        if (!hM.heures.length) throw err("Indique au moins une heure de passage.");
+        var dM = entierOuVide(o.duree, 5, 240, ERR_DUREE), pM = entierOuVide(o.places, 1, 10, ERR_PLACES);
+        // On ne garde que ce qui change par rapport à d'habitude
+        var md = { source: srcM, date: dateM, heures: hM.heures.join(", ") === base.heures.join(", ") ? "" : hM.heures.join(", "),
+          duree: dM && +dM !== base.duree ? dM : "", places: pM && +pM !== base.places ? pM : "",
+          salle: str(o.salle).trim() !== str(base.salle) ? str(o.salle).trim() : "", colleur: str(o.colleur).trim() !== str(base.colleur) ? str(o.colleur).trim() : "",
+          le: now.iso, par: par };
+        if (md.heures || md.duree || md.places || md.salle || md.colleur) { autresModifs.push(md); db.set("modifs", autresModifs); }
+      }
+      journal(db, now, o.retablir ? "Séance remise comme d'habitude" : "Séance modifiée", { classe: mmM ? mmM.classe : "", matiere: mM, date: dateM }, par);
+    } else if (a === "detail") {
+      // Programme et consignes d'une colle (chapitres, modalités…), visibles par les élèves
+      var mD = str(o.matiere), lD = str(o.lundi), texte = str(o.texte).replace(/\r/g, "").trim();
+      exigerMatiere(scope, mD);
+      if (!isDate(lD) || jourSemaine(lD) !== 1) throw err("Semaine invalide.");
+      if (texte.length > 2000) throw err("Texte trop long (2000 caractères au plus).");
+      var dets = db.t("details").filter(function (x) { return !(x.matiere === mD && x.lundi === lD); });
+      if (texte) dets.push({ matiere: mD, lundi: lD, texte: texte, le: now.iso, par: par });
+      db.set("details", dets);
     } else if (a === "classe") {
       exigerAdmin(scope);
       if (!str(o.nom)) throw err("Nom de classe requis.");
@@ -1088,7 +1356,7 @@ var COLLES = (function () {
       var nouveau = str(o.code);
       if (!/^[A-Za-z0-9]{4,20}$/.test(nouveau)) throw err("Le code doit faire de 4 à 20 lettres ou chiffres, sans espace.");
       var NOUV = nouveau.toUpperCase();
-      if (NOUV === String(db.reglage("code_admin", "")).toUpperCase() || find(db.t("matieres"), function (m) { return m.code && m.code.toUpperCase() === NOUV; }))
+      if (NOUV === String(db.reglage("code_admin", "")).toUpperCase() || find(db.t("matieres"), function (m) { return m.code && m.code.toUpperCase() === NOUV; }) || profParCode(db, NOUV))
         throw err("Ce code est déjà utilisé pour la gestion. Choisis-en un autre.");
       var rgA = db.t("reglages"), xA = find(rgA, function (y) { return y.cle === "code_acces"; });
       if (xA) xA.valeur = nouveau; else rgA.push({ cle: "code_acces", valeur: nouveau });
@@ -1117,7 +1385,18 @@ var COLLES = (function () {
       var r;
       if (["reserver", "annuler", "gestion"].indexOf(str(p.action)) >= 0) archiver(db, now);
       switch (str(p.action)) {
-        case "classes": verifierAcces(db, p); r = { ok: true, classes: db.t("classes").map(function (c) { return { id: c.id, nom: c.nom }; }) }; break;
+        case "classes": verifierAcces(db, p); r = { ok: true, classes: db.t("classes").map(function (c) { return { id: c.id, nom: c.nom }; }), profs: db.t("profs").length > 0 }; break;
+        case "professeurs":
+          verifierAcces(db, p);
+          r = { ok: true, noms: db.t("profs").map(function (x) { return x.nom; }).sort(function (a, b) { return a.localeCompare(b, "fr"); }) };
+          break;
+        case "prof_entrer":
+          verifierAcces(db, p);
+          var pe = find(db.t("profs"), function (x) { return x.nom === str(p.nom); });
+          if (!pe) throw err("Nom introuvable dans la liste des professeurs.");
+          if (!pe.code || pe.code.toUpperCase() !== str(p.pcode).toUpperCase()) throw err("Code incorrect. Il t'a été donné par l'administrateur du Colloscope.");
+          r = { ok: true, nom: pe.nom };
+          break;
         case "etat": r = etat(db, p, now); break;
         case "consulter": r = consulter(db, p, now); break;
         case "annuaire": r = annuaire(db, p, now); break;
@@ -1163,7 +1442,7 @@ var COLLES = (function () {
         var id = b[0] + "-" + c.id;
         matieres.push({ id: id, classe: c.id, nom: b[1], couleur: b[2], duree: b[3], places: "2",
           info: c.id === "hec2" && (b[0] === "eco" || b[0] === "droit") ? info : b[0] === "francais" ? "Séances fixées au fil de l'année" : "",
-          code: codes[id] || b[0] + (c.id === "hec1" ? "1" : "") });
+          code: codes[id] || b[0] });   // un code par matière, le même pour HEC1 et HEC2 (un prof = un code)
       });
     });
     return {
@@ -1175,7 +1454,7 @@ var COLLES = (function () {
         src("r-droit-lun", "droit-hec2", 1, lundiH, "2026-09-28"),
         src("r-droit-jeu", "droit-hec2", 4, jeudiH, "2026-09-28")
       ],
-      ponctuels: [], annulations: [], inscriptions: [], journal: [], ouvertures: [], archives: [],
+      ponctuels: [], annulations: [], inscriptions: [], journal: [], ouvertures: [], archives: [], avis: [], modifs: [], details: [], profs: [],
       fermetures: FERME.map(function (f) { return { debut: f[0], fin: f[1], motif: f[2] }; }),
       reglages: [{ cle: "code_admin", valeur: codes.admin || "admin" }, { cle: "code_acces", valeur: codes.acces || "PREPA" }, { cle: "debut_annee", valeur: "2026-09-01" },
                  { cle: "ouverture_jours", valeur: "14" }, { cle: "ouverture_heure", valeur: "12:00" }]
@@ -1303,7 +1582,7 @@ function api(p) {
 var CLE_PROFIL = "colloscope-profil";
 var CLE_ACCES = "colloscope-acces";
 function debutConnexion() { var c = LS.get(CLE_ACCES); return c ? { etape: "classe", code: c } : { etape: "acces" }; }
-var S = { profil: LS.get(CLE_PROFIL), etat: null, ob: debutConnexion(), g: null, gm: "", gtab: "seances", vue: null, maj: false };
+var S = { profil: LS.get(CLE_PROFIL), etat: null, ob: debutConnexion(), g: null, gm: "", gc: LS.get("colloscope-gestion-classe") || "", gtab: "seances", vue: null, maj: false };
 function profilComplet() { var p = S.profil; return !!(p && p.classe && p.code && p.eleve && p.pin); }
 function sauverProfil() { LS.set(CLE_PROFIL, S.profil); }
 
@@ -1349,10 +1628,10 @@ function avis(type, html, extra) {
   return '<div class="avis ' + (type || "") + '" role="' + (type === "attention" ? "status" : "note") + '">' + (type === "attention" ? ICON.attention : ICON.info) + '<span>' + html + '</span>' + (extra || "") + '</div>';
 }
 function bandeauDemo() {
-  return DEMO ? '<p class="demo"><b>Démonstration.</b> Les données restent sur cet appareil. Code d\'accès <code>PREPA</code>, codes de gestion <code>eco</code>, <code>eco1</code>, <code>maths</code>… ou <code>admin</code>.</p>' : "";
+  return DEMO ? '<p class="demo"><b>Démonstration.</b> Les données restent sur cet appareil. Code d\'accès <code>PREPA</code>, codes de gestion <code>eco</code>, <code>droit</code>, <code>maths</code>… ou <code>admin</code>.</p>' : "";
 }
 function piedPage() {
-  return (DEMO ? '<p class="note" style="margin-top:40px">Démonstration : les données restent sur cet appareil. Code d\'accès <code>PREPA</code>, codes de gestion <code>eco</code>, <code>eco1</code>, <code>maths</code>… ou <code>admin</code>.</p>' : '') +
+  return (DEMO ? '<p class="note" style="margin-top:40px">Démonstration : les données restent sur cet appareil. Code d\'accès <code>PREPA</code>, codes de gestion <code>eco</code>, <code>droit</code>, <code>maths</code>… ou <code>admin</code>.</p>' : '') +
     '<footer class="pied"' + (DEMO ? ' style="margin-top:16px"' : '') + '><span>' + esc(CONFIG.LYCEE) + '</span><button data-act="aller-gestion">Espace gestion</button>' +
     (DEMO ? '<button data-act="demo-reset">Réinitialiser la démo</button>' : '') + '</footer>';
 }
@@ -1365,7 +1644,7 @@ function feuilleFormulaire(o) {
         return '<option value="' + esc(op[0]) + '"' + (String(op[0]) === String(v) ? " selected" : "") + '>' + esc(op[1]) + '</option>';
       }).join("") + '</select>';
     } else if (c.type === "textarea") {
-      input = '<textarea class="entree" id="' + id + '">' + esc(v) + '</textarea>';
+      input = '<textarea class="entree" id="' + id + '" placeholder="' + esc(c.placeholder || "") + '"' + (c.attrs || "") + '>' + esc(v) + '</textarea>';
     } else {
       input = '<input class="entree" id="' + id + '" type="' + (c.type || "text") + '" value="' + esc(v) + '" placeholder="' + esc(c.placeholder || "") + '"' + (c.attrs || "") + '>';
     }
@@ -1414,7 +1693,7 @@ function lienGoogle(c) {
   var dt = function (d, t) { return d.replace(/-/g, "") + "T" + t.replace(":", "") + "00"; };
   return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(titreEv(c)) +
     "&dates=" + dt(c.date, c.debut) + "/" + dt(c.date, c.fin) + "&ctz=Europe/Paris&location=" + encodeURIComponent(lieuDe(c)) +
-    "&details=" + encodeURIComponent((c.info || "") + "\n" + URL_SITE);
+    "&details=" + encodeURIComponent([c.info, c.detail ? "Programme : " + c.detail : "", URL_SITE].filter(Boolean).join("\n"));
 }
 function feuilleAgenda(c) {
   ouvrirFeuille('<h3>Ajouter à mon agenda</h3><div class="resume"><span class="muet">' + esc(titreEv(c)) + ', ' + esc(dateLongue(c.date)) + ' à ' + hc(c.debut) + '</span></div>' +
@@ -1442,8 +1721,18 @@ function vueArrivee() {
     else if (!ob.classes) { html += chargement(); if (!ob.enCours) { ob.enCours = true; chargerClasses(); } }
     else html += '<div class="liste">' + ob.classes.map(function (c) {
       return '<button class="ligne" data-act="classe" data-id="' + esc(c.id) + '"><span class="corps"><span class="principal">' + esc(c.nom) + '</span></span>' + ICON.chev + '</button>';
-    }).join("") + '</div>';
+    }).join("") + (ob.profs ? '<button class="ligne" data-act="ob-profs"><span class="corps"><span class="principal">Professeurs</span><span class="secondaire">Gestion de vos colles</span></span>' + ICON.chev + '</button>' : '') + '</div>';
     html += '</div></div>' + piedPage();
+  } else if (ob.etape === "prof-nom") {
+    html += tete({ retour: "Classes", retourAct: "ob-retour" }) + '<div class="titre"><h1>Professeurs</h1><p>Choisissez votre nom.</p></div>' +
+      '<div class="section"><div class="liste">' + (ob.profsNoms.length ? ob.profsNoms.map(function (n) {
+        return '<button class="ligne" data-act="prof-nom" data-nom="' + esc(n) + '"><span class="corps"><span class="principal">' + esc(n) + '</span></span>' + ICON.chev + '</button>';
+      }).join("") : '<div class="vide">La liste des professeurs n\'a pas encore été ajoutée.</div>') + '</div></div>';
+  } else if (ob.etape === "prof-code") {
+    html += tete({ retour: "Changer de nom", retourAct: "ob-retour" }) + '<form class="formulaire" id="f-prof" style="margin-top:28px">' +
+      '<div class="titre" style="padding:0"><h1>Bonjour</h1><p>' + esc(ob.prof) + '. Entrez le code personnel que l\'administrateur du Colloscope vous a donné. Il ne sera plus demandé sur cet appareil.</p></div>' +
+      '<label class="champ" for="pcode"><span>Code personnel</span><input class="entree" id="pcode" autocomplete="off" autocapitalize="characters" spellcheck="false" required></label>' +
+      '<div class="erreur" id="err" role="alert"></div><button class="btn primaire plein" id="ok">Entrer</button></form>';
   } else if (ob.etape === "nom") {
     html += tete({ retour: "Classes", retourAct: "ob-retour" }) + '<div class="titre"><h1>Qui es-tu ?</h1><p>' + esc(ob.classe.nom) + '. Choisis ton nom dans la liste.</p></div>' +
       '<div class="section"><div class="liste">' + (ob.eleves.length ? ob.eleves.map(function (n) {
@@ -1463,6 +1752,7 @@ function vueArrivee() {
   $("#app").innerHTML = html;
   if (ob.etape === "acces") $("#f-acces").onsubmit = soumettreAcces;
   if (ob.etape === "pin") $("#f-pin").onsubmit = soumettrePin;
+  if (ob.etape === "prof-code") $("#f-prof").onsubmit = soumettreCodeProf;
   var f = $("#app input"); if (f && !("ontouchstart" in window)) f.focus();
 }
 function chargerClasses() {
@@ -1470,8 +1760,30 @@ function chargerClasses() {
     S.ob.enCours = false;
     if (!r.ok && /Code d'accès/.test(r.error)) { LS.del(CLE_ACCES); S.ob = { etape: "acces", erreur: "Le code d'accès a changé. Entre le nouveau code." }; }
     else if (!r.ok) S.ob.erreur = r.error;
-    else { S.ob.classes = r.classes; S.ob.erreur = ""; }
+    else { S.ob.classes = r.classes; S.ob.profs = !!r.profs; S.ob.erreur = ""; }
     rendre();
+  });
+}
+// Professeurs : nom, puis code personnel ; l'appareil s'en souvient, comme pour les élèves
+var CLE_PROF = "colloscope-prof";
+function choisirProfs() {
+  api({ action: "professeurs", code: S.ob.code }).then(function (r) {
+    if (!r.ok) { toast(r.error, false); if (/Code d'accès/.test(r.error)) { LS.del(CLE_ACCES); S.ob = { etape: "acces" }; rendre(); } return; }
+    S.ob.profsNoms = r.noms; S.ob.etape = "prof-nom"; rendre();
+  });
+}
+function soumettreCodeProf(e) {
+  e.preventDefault();
+  var pcode = $("#pcode").value.trim(), b = $("#ok");
+  if (!pcode) return;
+  enAttente(b);
+  api({ action: "prof_entrer", code: S.ob.code, nom: S.ob.prof, pcode: pcode }).then(function (r) {
+    if (!r.ok) { $("#err").textContent = r.error; finAttente(b); return; }
+    LS.set(CLE_PROF, { nom: r.nom, code: pcode });
+    SS.set("colloscope-gestion", pcode);
+    S.g = null; S.gErreur = ""; S.gtab = "seances";
+    S.ob = debutConnexion();
+    location.hash = "gestion";
   });
 }
 function soumettreAcces(e) {
@@ -1480,7 +1792,7 @@ function soumettreAcces(e) {
   api({ action: "classes", code: code }).then(function (r) {
     if (!r.ok) { $("#err").textContent = r.error; finAttente(b); return; }
     LS.set(CLE_ACCES, code);
-    S.ob = { etape: "classe", code: code, classes: r.classes }; rendre();
+    S.ob = { etape: "classe", code: code, classes: r.classes, profs: !!r.profs }; rendre();
   });
 }
 function choisirClasse(id) {
@@ -1676,8 +1988,13 @@ function sieges(c) {
 }
 // Colleur et salle : toujours affichés, « à préciser » tant qu'ils ne sont pas saisis
 function valeurOuManque(v) { return v ? esc(v) : '<span class="manque">à préciser</span>'; }
-function metaSeance(s) {
-  return '<p class="meta-seance"><span>Colleur <b>' + valeurOuManque(s.colleur) + '</b></span><span>Salle <b>' + valeurOuManque(s.salle) + '</b></span></p>';
+function metaSeance(s, m) {
+  return '<p class="meta-seance"><span>Colleur <b>' + valeurOuManque(s.colleur) + '</b></span><span>Salle <b>' + valeurOuManque(s.salle) + '</b></span>' +
+    (m && s.duree && s.duree !== m.duree ? '<span>Durée <b>' + s.duree + ' min</b></span>' : '') + '</p>';
+}
+// Programme et consignes écrits par le prof pour cette colle
+function programme(texte, titre, cls) {
+  return texte ? '<div class="programme' + (cls ? " " + cls : "") + '"><h4>' + esc(titre || "Programme et consignes") + '</h4><p>' + esc(texte) + '</p></div>' : '';
 }
 function infosSeance(colleur, salle) {
   return '<dl class="infos"><div><dt>Colleur</dt><dd>' + valeurOuManque(colleur) + '</dd></div><div><dt>Salle</dt><dd>' + valeurOuManque(salle) + '</dd></div></dl>';
@@ -1694,6 +2011,7 @@ function etatCreneau(c, w) {
   if (c.etat === "passe") return { cls: "passe", txt: '<span class="e-complet">Passé</span>' };
   if (c.etat === "complet") return { cls: "complet", txt: '<span class="e-complet">Complet</span>' };
   if (!w.ouvert) return { cls: "ferme", txt: '<span class="e-ferme">Fermé</span>' };
+  if (c.etat === "conflit") return { cls: "conflit", txt: '<span class="e-ferme">Autre colle</span>' };
   if (c.restantes === 1 && c.places > 1) return { cls: "libre", txt: '<span class="e-dernier">Dernière place</span>' };
   return { cls: "libre", txt: '<span class="e-libre">' + places(c.restantes) + '</span>' };
 }
@@ -1705,7 +2023,8 @@ function vueMatiere(mid, lundi) {
   var visibles = m.semaines.filter(function (w) { return !w.termine; });
   var w = (lundi && semaine(m, lundi)) || colleUtile(m) || visibles[0];
   var html = tete({ retour: "Accueil", maj: "maj" });
-  html += '<div class="titre"><h1>' + esc(m.nom) + '</h1><p>' + esc([m.info, m.places > 1 ? m.places + " élèves par créneau" : ""].filter(Boolean).join(". ")) + (m.info || m.places > 1 ? "." : "") + '</p></div>';
+  var infosM = [m.info, m.periode > 1 ? "Une colle toutes les " + m.periode + " semaines" : "", m.places > 1 ? m.places + " élèves par créneau" : ""].filter(Boolean);
+  html += '<div class="titre"><h1>' + esc(m.nom) + '</h1><p>' + esc(infosM.join(". ")) + (infosM.length ? "." : "") + '</p></div>';
   if (!w) {
     html += '<div class="section"><div class="liste"><div class="vide">' + (m.semaines.length ? "Aucune colle à venir pour l'instant." : "Le planning de cette matière n'a pas encore été saisi. Il apparaîtra ici.") + '</div></div></div>';
     $("#app").innerHTML = html; return;
@@ -1720,6 +2039,7 @@ function vueMatiere(mid, lundi) {
   else if (!w.ouvert) html += '<div style="margin-top:20px">' + avis("", "Les inscriptions ouvrent le <b>" + esc(dateLongue(w.ouverture.date)) + " à " + hc(w.ouverture.heure) + "</b>. Tu peux déjà voir les créneaux.") + '</div>';
   else if (w.moi) html += '<div style="margin-top:20px">' + avis("bleu", "Tu es inscrit <b>" + esc(dateLongue(w.moi.date)) + " à " + hc(w.moi.debut) + "</b>. Touche un autre créneau pour changer.") + '</div>';
   else if (!w.termine) html += '<p class="note" style="margin-top:16px">Choisis un seul créneau pour la colle ' + w.num + ', sur l\'une de ces dates.</p>';
+  if (w.detail && !w.annulee) html += '<div class="programme eleve"><h2>Programme et consignes</h2><p>' + esc(w.detail) + '</p></div>';
 
   var parDate = {};
   w.seances.forEach(function (s) { (parDate[s.date] = parDate[s.date] || []).push(s); });
@@ -1727,11 +2047,11 @@ function vueMatiere(mid, lundi) {
     var finie = !w.termine && parDate[d].every(function (s) { return !s.annule && s.creneaux.every(function (c) { return c.etat === "passe"; }); });
     if (finie) return;
     parDate[d].forEach(function (s, k) {
-      html += '<div class="jour">' + (k === 0 ? '<div class="jour-tete"><h2>' + esc(cap(dateLongue(d))) + '</h2></div>' : '') + metaSeance(s) + '<div class="liste">';
+      html += '<div class="jour">' + (k === 0 ? '<div class="jour-tete"><h2>' + esc(cap(dateLongue(d))) + '</h2></div>' : '') + metaSeance(s, m) + '<div class="liste">';
       if (s.annule) html += '<div class="annulee">Séance annulée' + (s.annule !== "Séance annulée" ? ". " + esc(s.annule) : "") + '</div>';
       else html += s.creneaux.map(function (c) {
         var st = etatCreneau(c, w);
-        var off = c.etat === "passe" || c.etat === "complet" || (c.etat === "libre" && !w.ouvert);
+        var off = c.etat === "passe" || c.etat === "complet" || ((c.etat === "libre" || c.etat === "conflit") && !w.ouvert);
         return '<button class="creneau ' + st.cls + '" data-act="creneau" data-id="' + esc(c.id) + '"' + (off ? " disabled" : "") +
           ' aria-label="' + esc(plage(c.debut, c.fin)) + '">' + celluleHeure(c, S.profil.eleve) + sieges(c) +
           '<span class="etat">' + st.txt + '</span></button>';
@@ -1819,10 +2139,11 @@ function cliqueCreneau(id) {
   var t = trouverCreneau(id);
   if (!t) return;
   if (t.c.etat === "moi") { feuilleMaColle(maColle(id)); return; }
+  if (t.c.etat === "conflit" && t.w.ouvert) { toast(t.c.conflit || "Ce créneau chevauche une autre de tes colles.", false); return; }
   if (t.c.etat !== "libre" || !t.w.ouvert) return;
   var ancien = t.w.moi;
   var corps = '<div class="resume"><span class="muet">' + esc(t.m.nom) + ', colle ' + t.w.num + '</span><span class="grand">' + plage(t.c.debut, t.c.fin) + '</span>' +
-    '<span class="muet">' + esc(cap(dateLongue(t.s.date))) + '</span></div>' + infosSeance(t.s.colleur, t.s.salle) +
+    '<span class="muet">' + esc(cap(dateLongue(t.s.date))) + '</span></div>' + infosSeance(t.s.colleur, t.s.salle) + programme(t.w.detail) +
     (ancien ? '<p class="note">Ton créneau actuel, ' + esc(dateCourte(ancien.date)) + ' à ' + hc(ancien.debut) + ', sera libéré.</p>' : '');
   feuilleConfirmer(ancien ? "Changer de créneau" : "Réserver ce créneau", corps, ancien ? "Changer de créneau" : "Réserver", false, function () {
     return actionEleve({ action: "reserver", creneau: id }).then(function (r) {
@@ -1840,9 +2161,9 @@ function feuilleMaColle(c, nouveau) {
   if (!c) return;
   ouvrirFeuille('<h3>' + (nouveau ? "C'est réservé" : esc(c.matiereNom) + ", colle " + esc(c.num)) + '</h3>' +
     '<div class="resume">' + (nouveau ? '<span class="muet">' + esc(c.matiereNom) + ', colle ' + esc(c.num) + '</span>' : '') + '<span class="grand">' + plage(c.debut, c.fin) + '</span>' +
-    '<span class="muet">' + esc(cap(dateLongue(c.date))) + '</span></div>' + infosSeance(c.colleur, c.salle) +
+    '<span class="muet">' + esc(cap(dateLongue(c.date))) + '</span></div>' + infosSeance(c.colleur, c.salle) + programme(c.detail) +
     '<div class="pied-feuille"><button class="btn primaire plein" data-act="agenda" data-c="' + esc(c.creneau) + '">' + ICON.agenda + 'Ajouter à mon agenda</button>' +
-    '<div class="actions"><button class="btn" data-act="aller" data-h="c-' + esc(c.matiere) + "-" + O.semaine(c.date) + '">Changer</button>' +
+    '<div class="actions"><button class="btn" data-act="aller" data-h="c-' + esc(c.matiere) + "-" + esc(c.lundi || O.semaine(c.date)) + '">Changer</button>' +
     '<button class="btn danger" data-act="annuler" data-c="' + esc(c.creneau) + '">Annuler</button></div>' +
     '<button class="btn plein discret" data-act="fermer">Fermer</button></div>', c.matiereNom);
 }
@@ -1884,11 +2205,11 @@ function feuilleProfil() {
    ===================================================================== */
 var JOUR_OPT = [[1, "Lundi"], [2, "Mardi"], [3, "Mercredi"], [4, "Jeudi"], [5, "Vendredi"], [6, "Samedi"]];
 var FREQ_OPT = [[1, "Chaque semaine"], [2, "Une semaine sur deux"], [3, "Une semaine sur trois"], [4, "Une semaine sur quatre"]];
-function gcode() { return SS.get("colloscope-gestion"); }
+function gcode() { return SS.get("colloscope-gestion") || ((LS.get(CLE_PROF) || {}).code || ""); }
 function chargerGestion() {
   return api({ action: "gestion_vue", gcode: gcode() }).then(function (r) {
     S.maj = false; S.gEnCours = false;
-    if (!r.ok && /^Code/.test(r.error)) { SS.set("colloscope-gestion", ""); S.g = null; S.gErreur = r.error; }   // mauvais code
+    if (!r.ok && /^Code/.test(r.error)) { SS.set("colloscope-gestion", ""); LS.del(CLE_PROF); S.g = null; S.gErreur = r.error; }   // mauvais code
     else if (!r.ok && S.g) { toast(r.error, false); }                                                       // réseau, données déjà là : on les garde
     else if (!r.ok) { S.gErreurReseau = r.error; }                                                          // réseau : on garde le code
     else {
@@ -1912,7 +2233,7 @@ function opGestion(op, data, msg) {
 function vueGestion() {
   var html = tete({ retour: "Colloscope", maj: gcode() ? "maj-gestion" : "" });
   if (!gcode()) {
-    html += '<form class="formulaire" id="f-g" style="margin-top:28px"><div class="titre" style="padding:0"><h1>Espace gestion</h1><p>Pour les professeurs et les délégués. Chaque matière a son code ; le code administrateur ouvre tout.</p></div>' +
+    html += '<form class="formulaire" id="f-g" style="margin-top:28px"><div class="titre" style="padding:0"><h1>Espace gestion</h1><p>Pour les professeurs et les délégués : code personnel du professeur, code de la matière, ou code administrateur.</p></div>' +
       bandeauDemo() +
       '<label class="champ" for="gc"><span>Code de gestion</span><input class="entree" id="gc" type="password" autocomplete="current-password" required></label>' +
       '<div class="erreur" id="err" role="alert">' + esc(S.gErreur || "") + '</div><button class="btn primaire plein" id="ok">Entrer</button></form>';
@@ -1930,21 +2251,28 @@ function vueGestion() {
     return;
   }
   var g = S.g;
-  var m = g.matieres.filter(function (x) { return x.id === S.gm; })[0];
+  // Classe, puis matière : un prof qui a HEC1 et HEC2 change de classe avec le menu, sans autre code
+  var classesG = g.classes.filter(function (c) { return g.matieres.some(function (x) { return x.classe === c.id; }); });
+  var mCour = g.matieres.filter(function (x) { return x.id === S.gm; })[0];
+  if (!classesG.some(function (c) { return c.id === S.gc; })) S.gc = mCour ? mCour.classe : (classesG[0] ? classesG[0].id : "");
+  var matsC = g.matieres.filter(function (x) { return x.classe === S.gc; });
+  if (!matsC.some(function (x) { return x.id === S.gm; })) S.gm = matsC.length ? matsC[0].id : "";
+  var m = matsC.filter(function (x) { return x.id === S.gm; })[0];
   var parMatiere = S.gtab === "seances" || S.gtab === "planning";
-  html += '<div class="titre">';
-  if (parMatiere && g.matieres.length > 1) {
-    html += '<label class="selecteur" for="sel-gm"><select id="sel-gm" aria-label="Matière">' + g.matieres.map(function (x) {
-      var c = g.classes.filter(function (k) { return k.id === x.classe; })[0];
-      return '<option value="' + esc(x.id) + '"' + (x.id === S.gm ? " selected" : "") + '>' + esc(x.nom + (c && g.classes.length > 1 ? " (" + c.nom + ")" : "")) + '</option>';
-    }).join("") + '</select>' + ICON.bas + '</label>';
-  } else html += '<h1>' + esc(parMatiere && m ? m.nom : "Espace gestion") + '</h1>';
-  var plusieursClasses = g.classes.length > 1;
-  var acces = g.matieres.map(function (x) {
+  html += '<div class="titre"><div class="selecteurs">';
+  if (parMatiere && matsC.length > 1) html += menuGestion("sel-gm", "Matière", matsC.map(function (x) { return [x.id, x.nom]; }), S.gm);
+  else html += '<h1>' + esc(parMatiere && m ? m.nom : "Espace gestion") + '</h1>';
+  if (parMatiere && classesG.length > 1) html += menuGestion("sel-gc", "Classe", classesG.map(function (c) { return [c.id, c.nom]; }), S.gc, "classe");
+  html += '</div>';
+  // « Accès à Économie (HEC1, HEC2) »
+  var parNom = {}, nomsM = [];
+  g.matieres.forEach(function (x) {
     var c = g.classes.filter(function (k) { return k.id === x.classe; })[0];
-    return x.nom + (plusieursClasses && c ? " (" + c.nom + ")" : "");
+    if (!parNom[x.nom]) { parNom[x.nom] = []; nomsM.push(x.nom); }
+    if (c) parNom[x.nom].push(c.nom);
   });
-  html += '<p>' + (g.admin ? "Administrateur : toutes les matières et toutes les classes." : "Accès limité à " + esc(joindre(acces)) + ".") + '</p></div>';
+  var acces = nomsM.map(function (n) { return n + (g.classes.length > 1 ? " (" + parNom[n].join(", ") + ")" : ""); });
+  html += '<p>' + (g.admin ? "Administrateur : toutes les matières et toutes les classes." : (g.prof ? esc(g.prof) + ". " : "") + "Accès à " + esc(joindre(acces)) + ".") + '</p></div>';
   var tabs = [["seances", "Inscriptions"], ["planning", "Planning"], ["journal", "Journal"]];
   if (g.admin) tabs.push(["admin", "Administration"]);
   html += '<nav class="onglets" aria-label="Sections">' + tabs.map(function (t) {
@@ -1959,6 +2287,19 @@ function vueGestion() {
   $("#app").innerHTML = html;
   var sel = $("#sel-gm");
   if (sel) sel.onchange = function () { S.gm = sel.value; rendre(); };
+  var selC = $("#sel-gc");
+  if (selC) selC.onchange = function () {
+    var nom = m ? m.nom : "";
+    S.gc = selC.value; LS.set("colloscope-gestion-classe", S.gc);
+    var meme = g.matieres.filter(function (x) { return x.classe === S.gc && x.nom === nom; })[0];
+    S.gm = meme ? meme.id : "";
+    rendre();
+  };
+}
+function menuGestion(id, label, options, valeur, cls) {
+  return '<label class="selecteur' + (cls ? " " + cls : "") + '" for="' + id + '"><select id="' + id + '" aria-label="' + label + '">' + options.map(function (o) {
+    return '<option value="' + esc(o[0]) + '"' + (o[0] === valeur ? " selected" : "") + '>' + esc(o[1]) + '</option>';
+  }).join("") + '</select>' + ICON.bas + '</label>';
 }
 function gSeances(m) {
   var g = S.g, html = '';
@@ -1966,21 +2307,28 @@ function gSeances(m) {
   if (!ws.length) return '<div class="section"><div class="liste"><div class="vide">Aucune colle dans les prochaines semaines. Ajoute une colle régulière ou une séance dans Planning.</div></div></div>';
   ws.forEach(function (w) {
     var inscrits = 0, total = 0;
-    w.seances.forEach(function (s) { if (!s.annule) s.creneaux.forEach(function (c) { inscrits += c.eleves.length; total += m.places; }); });
+    w.seances.forEach(function (s) { if (!s.annule) s.creneaux.forEach(function (c) { inscrits += c.eleves.length; total += s.places; }); });
     html += '<div class="section"><div class="jour-tete"><h2 style="font-size:17px;color:var(--encre)">Colle ' + w.num + ' <span style="color:var(--discret);font-weight:400">' + esc(listeDates(w.seances.map(function (s) { return s.date; }))) + '</span></h2>' +
       '<span class="qui chiffres">' + (w.ouvert ? inscrits + " inscrits sur " + total : "Ouvre le " + esc(dateJM(w.ouverture.date))) + '</span></div>';
     if (!w.ouvert) html += '<div class="ouverture-ligne"><span class="note">Ouverture automatique le ' + esc(dateLongue(w.ouverture.date)) + ' à ' + hc(w.ouverture.heure) + '.</span>' +
       boutonOuvrir(m, w, true) + '</div>';
     else if (w.aLaMain) html += '<div class="ouverture-ligne"><span class="note">Inscriptions ouvertes à la main.</span>' + boutonOuvrir(m, w, false) + '</div>';
+    html += w.detail
+      ? '<div class="programme"><div class="programme-tete"><h4>Programme et consignes</h4><button class="btn petit discret" data-act="g-detail" data-l="' + esc(w.lundi) + '">Modifier</button></div><p>' + esc(w.detail) + '</p></div>'
+      : '<button class="ajout-programme" data-act="g-detail" data-l="' + esc(w.lundi) + '">+ Ajouter le programme de la colle <span>(chapitres, modalités…)</span></button>';
     w.seances.forEach(function (s) {
-      html += '<div class="liste seance-g"><div class="entete"><span><b>' + esc(cap(dateLongue(s.date))) + '</b> <span>' + (s.colleur || s.salle ? esc([s.colleur, s.salle ? "salle " + s.salle : ""].filter(Boolean).join(", ")) : "colleur et salle à préciser dans Planning") + '</span>'  + '</span>' +
-        '<button class="btn petit ' + (s.annule ? "" : "discret") + '" data-act="g-annul" data-src="' + esc(s.source) + '" data-date="' + esc(s.date) + '" data-on="' + (s.annule ? 0 : 1) + '">' + (s.annule ? "Rétablir" : "Annuler la séance") + '</button></div>';
+      var lieu = [s.colleur, s.salle ? "salle " + s.salle : ""].filter(Boolean).join(", ") || "colleur et salle à préciser";
+      var autrement = [s.duree !== m.duree ? s.duree + " min" : "", s.places !== m.places ? s.places + (s.places > 1 ? " élèves" : " élève") + " par créneau" : ""].filter(Boolean);
+      html += '<div class="liste seance-g"><div class="entete"><span><b>' + esc(cap(dateLongue(s.date))) + '</b> <span>' + esc([lieu].concat(autrement).join(", ")) + '</span>' +
+        (s.modifiee ? ' <span class="marque">modifiée ce jour-là</span>' : '') + '</span>' +
+        '<div class="actions-seance">' + (s.annule ? '' : '<button class="btn petit discret" data-act="g-modif" data-src="' + esc(s.source) + '" data-date="' + esc(s.date) + '">Modifier</button>') +
+        '<button class="btn petit ' + (s.annule ? "" : "discret") + '" data-act="g-annul" data-src="' + esc(s.source) + '" data-date="' + esc(s.date) + '" data-on="' + (s.annule ? 0 : 1) + '">' + (s.annule ? "Rétablir" : "Annuler") + '</button></div></div>';
       if (s.annule) html += '<div class="annulee">Annulée' + (s.annule !== "Séance annulée" ? ". " + esc(s.annule) : "") + '</div>';
       else html += s.creneaux.map(function (c) {
         var noms = c.eleves.map(function (n) {
           return '<div class="nom"><span>' + esc(n) + '</span><button class="btn petit discret danger retirer" data-act="g-desinscrire" data-c="' + esc(c.id) + '" data-n="' + esc(n) + '">Retirer</button></div>';
         });
-        var reste = m.places - c.eleves.length;
+        var reste = s.places - c.eleves.length;
         if (reste > 0) noms.push('<div class="nom libre"><span>' + (reste > 1 ? reste + " places libres" : "1 place libre") + '</span></div>');
         return '<div class="rang"><span class="h">' + h(c.debut) + '</span><div class="noms">' + noms.join("") + '</div></div>';
       }).join("");
@@ -1995,16 +2343,22 @@ function gSeances(m) {
 function heuresLisibles(t) { return O.parseHeures(t).heures.map(hc).join(", "); }
 function jourLisible(j) { return JOURS[+j] ? cap(JOURS[+j]) : "Jour inconnu"; }
 function freqLisible(f) { return (FREQ_OPT[(+f || 1) - 1] || FREQ_OPT[0])[1].toLowerCase(); }
+function elevesParCreneau(n) { return n + (+n > 1 ? " élèves" : " élève") + " par créneau"; }
+function autrementLisible(x) { return (x.duree ? ", " + x.duree + " min" : "") + (x.places ? ", " + elevesParCreneau(x.places) : ""); }
 function gPlanning(m) {
   var g = S.g;
   var regles = g.regles.filter(function (r) { return r.matiere === m.id; });
-  var html = '<div class="section"><div class="tete-section"><h2>Colles régulières</h2><button class="btn petit" data-act="g-regle">Ajouter</button></div>' +
+  var html = '<div class="section"><h2>Réglages de la matière</h2><div class="liste"><button class="ligne" data-act="g-params"><span class="corps">' +
+    '<span class="principal">' + m.duree + ' min par colle, ' + elevesParCreneau(m.places) + (m.periode > 1 ? ', une colle sur ' + m.periode + ' semaines' : '') + '</span>' +
+    '<span class="secondaire">' + esc(m.info || "Aucune précision pour les élèves") + '</span></span>' + ICON.chev + '</button></div>' +
+    '<p class="note">Valable pour toutes les séances, sauf celles réglées autrement ci-dessous ou modifiées pour un jour (onglet Inscriptions).</p></div>';
+  html += '<div class="section"><div class="tete-section"><h2>Colles régulières</h2><button class="btn petit" data-act="g-regle">Ajouter</button></div>' +
     '<p class="note">Une règle crée les séances de toute l\'année. Vacances de la zone A et jours fériés exclus.</p><div class="liste">';
   if (!regles.length) html += '<div class="vide">Aucune colle régulière.</div>';
   regles.forEach(function (r) {
     html += '<button class="ligne" data-act="g-regle" data-id="' + esc(r.id) + '"><span class="corps"><span class="principal">' + esc(jourLisible(r.jour)) + ', ' + esc(freqLisible(r.frequence)) + '</span>' +
       '<span class="secondaire chiffres">' + esc(heuresLisibles(r.heures)) + '</span>' +
-      '<span class="secondaire">Depuis le ' + esc(dateAn(r.debut)) + (r.fin ? ", jusqu'au " + esc(dateAn(r.fin)) : "") + (r.colleur ? ". " + esc(r.colleur) : "") + (r.salle ? ", salle " + esc(r.salle) : "") + '</span></span>' + ICON.chev + '</button>';
+      '<span class="secondaire">Depuis le ' + esc(dateAn(r.debut)) + (r.fin ? ", jusqu'au " + esc(dateAn(r.fin)) : "") + (r.colleur ? ". " + esc(r.colleur) : "") + (r.salle ? ", salle " + esc(r.salle) : "") + esc(autrementLisible(r)) + '</span></span>' + ICON.chev + '</button>';
   });
   html += '</div></div>';
   var pon = g.ponctuels.filter(function (p) { return p.matiere === m.id; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; });
@@ -2013,7 +2367,7 @@ function gPlanning(m) {
   if (!pon.length) html += '<div class="vide">Aucune séance ponctuelle.</div>';
   pon.forEach(function (p) {
     html += '<button class="ligne" data-act="g-ponctuel" data-id="' + esc(p.id) + '"><span class="corps"><span class="principal">' + esc(cap(dateLongue(p.date))) + '</span>' +
-      '<span class="secondaire chiffres">' + esc(heuresLisibles(p.heures)) + (p.colleur ? ". " + esc(p.colleur) : "") + (p.salle ? ", salle " + esc(p.salle) : "") + '</span></span>' + ICON.chev + '</button>';
+      '<span class="secondaire chiffres">' + esc(heuresLisibles(p.heures)) + (p.colleur ? ". " + esc(p.colleur) : "") + (p.salle ? ", salle " + esc(p.salle) : "") + esc(autrementLisible(p)) + '</span></span>' + ICON.chev + '</button>';
   });
   return html + '</div></div>';
 }
@@ -2036,9 +2390,10 @@ function gAdmin() {
   g.matieres.forEach(function (m) {
     var c = g.classes.filter(function (x) { return x.id === m.classe; })[0];
     html += '<button class="ligne" data-act="a-matiere" data-id="' + esc(m.id) + '"><span class="pastille" style="--c:' + esc(m.couleur) + '"></span><span class="corps"><span class="principal">' + esc(m.nom) + '</span>' +
-      '<span class="secondaire">' + esc(c ? c.nom : "") + ', ' + m.places + ' par créneau, ' + m.duree + ' min</span></span><span class="droite"><code>' + esc(m.code || "aucun code") + '</code></span>' + ICON.chev + '</button>';
+      '<span class="secondaire">' + esc(c ? c.nom : "") + ', ' + m.places + ' par créneau, ' + m.duree + ' min</span></span>' + ICON.chev + '</button>';
   });
   html += '</div></div>';
+  html += gProfs() + gCodesProfs();
   html += '<div class="section"><div class="tete-section"><h2>Classes</h2><button class="btn petit" data-act="a-classe">Ajouter</button></div><div class="liste">';
   g.classes.forEach(function (c) {
     var el = g.eleves.filter(function (e) { return e.classe === c.id; }), n = el.filter(function (e) { return e.aCode; }).length;
@@ -2058,6 +2413,72 @@ function gAdmin() {
         '<span class="secondaire">' + esc(x.debut === x.fin ? dateAn(x.debut) : "Du " + dateAn(x.debut) + " au " + dateAn(x.fin)) + '</span></span></div>';
     }).join("") : '<div class="vide">Aucune période renseignée.</div>') + '</div></div>';
   return html;
+}
+// Rappel de la matière et de la classe dans les formulaires, quand il y a plusieurs classes
+function avecClasse(matiereId) {
+  var m = S.g.matieres.filter(function (x) { return x.id === matiereId; })[0];
+  return m && S.g.classes.length > 1 ? ", " + m.nom + " " + nomClasse(m.classe) : "";
+}
+// Un code par matière, valable dans toutes les classes : un prof n'a qu'un code
+function groupesMatieres() {
+  var groupes = {}, ordre = [];
+  S.g.matieres.forEach(function (m) { if (!groupes[m.nom]) { groupes[m.nom] = []; ordre.push(m.nom); } groupes[m.nom].push(m); });
+  return ordre.map(function (nom) { return { nom: nom, matieres: groupes[nom] }; });
+}
+function codesDe(gr) { return gr.matieres.map(function (m) { return m.code || ""; }).filter(function (c, i, a) { return a.indexOf(c) === i; }); }
+function nomClasse(id) { var c = S.g.classes.filter(function (k) { return k.id === id; })[0]; return c ? c.nom : id; }
+function gCodesProfs() {
+  var grs = groupesMatieres(), differents = grs.some(function (gr) { return codesDe(gr).length > 1; });
+  var html = '<div class="section"><div class="tete-section"><h2>Codes par matière</h2>' + (differents ? '<button class="btn petit" data-act="a-unifier">Un code par matière</button>' : '') + '</div>' +
+    '<p class="note">Pour un délégué, ou un professeur qui n\'est pas dans la liste ci-dessus. Un code par matière, valable dans toutes les classes. Après un changement, l\'onglet « Codes » du Google Sheet n\'est plus à jour : les codes actuels sont ici.</p><div class="liste">';
+  grs.forEach(function (gr) {
+    var codes = codesDe(gr), m0 = gr.matieres[0];
+    html += '<button class="ligne" data-act="a-code" data-nom="' + esc(gr.nom) + '"><span class="pastille" style="--c:' + esc(m0.couleur) + '"></span><span class="corps"><span class="principal">' + esc(gr.nom) + '</span>' +
+      (codes.length > 1 ? '<span class="secondaire">Un code par classe : ' + esc(gr.matieres.map(function (m) { return nomClasse(m.classe) + " " + (m.code || "aucun"); }).join(", ")) + '</span>' : '') + '</span>' +
+      (codes.length === 1 ? '<span class="droite"><code>' + esc(codes[0] || "aucun") + '</code></span>' : '') + ICON.chev + '</button>';
+  });
+  return html + '</div></div>';
+}
+function gProfs() {
+  var pr = S.g.profs || [];
+  var html = '<div class="section"><div class="tete-section"><h2>Professeurs</h2><button class="btn petit" data-act="a-profs">' + (pr.length ? "Modifier la liste" : "Ajouter") + '</button></div>' +
+    '<p class="note">Chaque professeur entre le code d\'accès, choisit « Professeurs », son nom, puis son code personnel. Il gère ses matières dans toutes ses classes. Donne-lui son code une fois.</p><div class="liste">';
+  if (!pr.length) html += '<div class="vide">Aucun professeur pour l\'instant.</div>';
+  pr.forEach(function (p) {
+    html += '<div class="ligne"><span class="corps"><span class="principal">' + esc(p.nom) + '</span>' +
+      '<span class="secondaire">' + (p.acces ? esc(p.matieres) : '<span style="color:var(--ambre)">Aucune matière : ajoute-les dans la liste</span>') + '</span>' +
+      '<span class="secondaire">Code <code>' + esc(p.code) + '</code></span></span>' +
+      '<button class="btn petit discret" data-act="a-prof-code" data-n="' + esc(p.nom) + '">Nouveau code</button></div>';
+  });
+  return html + '</div></div>';
+}
+function formProfs() {
+  var texte = (S.g.profs || []).map(function (p) { return p.nom + (p.matieres ? " : " + p.matieres : ""); }).join("\n");
+  var noms = groupesMatieres().map(function (gr) { return gr.nom; });
+  feuilleFormulaire({
+    titre: "Professeurs",
+    intro: "Un professeur par ligne : son nom, deux-points, puis ses matières séparées par des virgules. « Économie » donne accès à l'économie de toutes les classes, « Économie HEC2 » à une seule classe. Les codes des professeurs déjà présents sont conservés.",
+    champs: [{ id: "texte", label: "Liste", aide: "Matières : " + noms.join(", "), type: "textarea", valeur: texte, placeholder: "DUPONT Jean : Économie, Droit\nMARTIN Claire : Mathématiques" }],
+    envoyer: function (v) {
+      return api({ action: "gestion", gcode: gcode(), op: "profs", data: { texte: v.texte } }).then(function (r) {
+        if (!r.ok) return r;
+        fermerFeuille();
+        toast("Liste enregistrée : " + r.nombre + " professeur" + (r.nombre > 1 ? "s" : "") + (r.ajoutes ? ", " + r.ajoutes + " ajouté" + (r.ajoutes > 1 ? "s" : "") : "") + (r.retires ? ", " + r.retires + " retiré" + (r.retires > 1 ? "s" : "") : ""));
+        return chargerGestion().then(function () { return r; });
+      });
+    }
+  });
+}
+function formCodeMatiere(nom) {
+  var gr = groupesMatieres().filter(function (x) { return x.nom === nom; })[0];
+  if (!gr) return;
+  var actuel = codesDe(gr).filter(Boolean)[0] || "";
+  feuilleFormulaire({
+    titre: "Code de " + nom,
+    intro: "Valable pour " + esc(joindre(gr.matieres.map(function (m) { return nomClasse(m.classe); }))) + ". À donner au professeur de " + esc(nom) + ", ou au délégué qui gère la matière.",
+    champs: [{ id: "code", label: "Code", aide: "4 à 20 lettres ou chiffres, sans espace", valeur: actuel }],
+    envoyer: function (v) { return opGestion("code_matiere", { nom: nom, code: v.code }, "Code enregistré"); }
+  });
 }
 function boutonOuvrir(m, w, ouvrir) {
   return '<button class="btn petit' + (ouvrir ? "" : " discret") + '" data-act="g-ouvrir" data-m="' + esc(m.id) + '" data-l="' + esc(w.lundi) + '" data-num="' + w.num +
@@ -2089,7 +2510,7 @@ function formRegle(id) {
   var an = +S.g.aujourdhui.slice(0, 4) + (+S.g.aujourdhui.slice(5, 7) >= 8 ? 1 : 0);
   var r = id ? S.g.regles.filter(function (x) { return x.id === id; })[0] : { matiere: S.gm, jour: 1, frequence: 1, debut: O.semaine(S.g.aujourdhui), fin: an + "-05-31" };
   feuilleFormulaire({
-    titre: id ? "Colle régulière" : "Nouvelle colle régulière",
+    titre: (id ? "Colle régulière" : "Nouvelle colle régulière") + avecClasse(r.matiere),
     champs: [
       { id: "jour", label: "Jour", type: "select", options: JOUR_OPT, valeur: r.jour },
       { id: "heures", label: "Heures de passage", aide: "Séparées par des virgules, par exemple 12h, 12h20, 12h40", valeur: r.heures ? heuresLisibles(r.heures) : "" },
@@ -2098,7 +2519,7 @@ function formRegle(id) {
       { id: "fin", label: "Dernière date", aide: "Facultatif", type: "date", valeur: r.fin },
       { id: "colleur", label: "Colleur", aide: "Facultatif", valeur: r.colleur, placeholder: "Mme Martin" },
       { id: "salle", label: "Salle", aide: "Facultatif", valeur: r.salle, placeholder: "C415" }
-    ],
+    ].concat(champsDureePlaces(r)),
     envoyer: function (v) { v.id = id || ""; v.matiere = r.matiere; return opGestion("regle", v, "Colle régulière enregistrée"); }
   });
   if (id) ajouterSuppr("Supprimer cette colle régulière ?", "Les séances à venir disparaîtront, avec leurs inscriptions.", function () { return opGestion("regle_suppr", { id: id }, "Supprimée"); });
@@ -2106,22 +2527,79 @@ function formRegle(id) {
 function formPonctuel(id) {
   var p = id ? S.g.ponctuels.filter(function (x) { return x.id === id; })[0] : { matiere: S.gm, date: S.g.aujourdhui };
   feuilleFormulaire({
-    titre: id ? "Séance ponctuelle" : "Nouvelle séance ponctuelle",
+    titre: (id ? "Séance ponctuelle" : "Nouvelle séance ponctuelle") + avecClasse(p.matiere),
     champs: [
       { id: "date", label: "Date", type: "date", valeur: p.date },
       { id: "heures", label: "Heures de passage", aide: "Par exemple 14h, 14h20, 14h40", valeur: p.heures ? heuresLisibles(p.heures) : "" },
       { id: "colleur", label: "Colleur", aide: "Facultatif", valeur: p.colleur },
       { id: "salle", label: "Salle", aide: "Facultatif", valeur: p.salle }
-    ],
+    ].concat(champsDureePlaces(p)),
     envoyer: function (v) { v.id = id || ""; v.matiere = p.matiere; return opGestion("ponctuel", v, "Séance enregistrée"); }
   });
   if (id) ajouterSuppr("Supprimer cette séance ?", "Les inscriptions à cette séance seront retirées.", function () { return opGestion("ponctuel_suppr", { id: id }, "Supprimée"); });
 }
 function ajouterSuppr(titre, texte, action) {
+  ajouterBouton("Supprimer", true, function () { feuilleConfirmer(titre, '<p class="note" style="font-size:14px">' + esc(texte) + '</p>', "Supprimer", true, action); });
+}
+// Bouton de plus, à gauche dans le pied d'un formulaire
+function ajouterBouton(texte, danger, clic) {
   var act = $("#ff-actions"), b = document.createElement("button");
-  b.type = "button"; b.className = "btn discret danger"; b.textContent = "Supprimer"; b.style.marginRight = "auto"; b.style.flex = "0 0 auto";
-  b.onclick = function () { feuilleConfirmer(titre, '<p class="note" style="font-size:14px">' + esc(texte) + '</p>', "Supprimer", true, action); };
+  b.type = "button"; b.className = "btn discret" + (danger ? " danger" : ""); b.textContent = texte; b.style.marginRight = "auto"; b.style.flex = "0 0 auto";
+  b.onclick = clic;
   act.insertBefore(b, act.firstChild);
+}
+var ATTR_DUREE = ' inputmode="numeric" min="5" max="240"', ATTR_PLACES = ' inputmode="numeric" min="1" max="10"';
+var PERIODE_OPT = [[1, "1 semaine"], [2, "2 semaines (quinzaine)"], [3, "3 semaines"], [4, "4 semaines"]];
+// Durée et places d'une colle régulière ou d'une séance : vides = réglages de la matière
+function champsDureePlaces(x) {
+  var m = S.g.matieres.filter(function (k) { return k.id === x.matiere; })[0] || { duree: 40, places: 2 };
+  return [
+    { id: "duree", label: "Durée d'une colle, en minutes", aide: "Facultatif. Sinon " + m.duree + " min, comme le reste de la matière", type: "number", valeur: x.duree, placeholder: String(m.duree), attrs: ATTR_DUREE },
+    { id: "places", label: "Élèves par créneau", aide: "Facultatif. Sinon " + m.places + ", comme le reste de la matière", type: "number", valeur: x.places, placeholder: String(m.places), attrs: ATTR_PLACES }
+  ];
+}
+function formParams(m) {
+  var c = S.g.classes.filter(function (k) { return k.id === m.classe; })[0];
+  feuilleFormulaire({
+    titre: "Réglages de " + m.nom + (c && S.g.classes.length > 1 ? ", " + c.nom : ""),
+    intro: "Pour toutes les séances de la matière. Une séance précise peut être réglée autrement : bouton Modifier, dans l'onglet Inscriptions.",
+    champs: [
+      { id: "duree", label: "Durée d'une colle, en minutes", type: "number", valeur: m.duree, attrs: ATTR_DUREE },
+      { id: "places", label: "Élèves par créneau", type: "number", valeur: m.places, attrs: ATTR_PLACES },
+      { id: "periode", label: "Une colle s'étale sur", aide: "Chaque élève passe une fois par colle. Sur deux semaines : quinzaine.", type: "select", options: PERIODE_OPT, valeur: m.periode || 1 },
+      { id: "ancrage", label: "Une semaine où commence une colle", aide: "Seulement pour les colles sur plusieurs semaines. Les suivantes s'enchaînent, semaines de vacances non comptées.", type: "date", valeur: m.ancrage },
+      { id: "info", label: "Précisions pour les élèves", aide: "Facultatif. Affiché en haut de la page de la matière.", valeur: m.info, placeholder: "20 min de préparation, puis 20 min de passage" }
+    ],
+    envoyer: function (v) { v.id = m.id; return opGestion("matiere_params", v, "Réglages enregistrés"); }
+  });
+}
+// Une séance changée pour ce jour seulement
+function formModifSeance(m, s) {
+  feuilleFormulaire({
+    titre: cap(dateLongue(s.date)) + avecClasse(m.id),
+    intro: "Pour ce jour seulement : les autres semaines ne changent pas. Si un horaire disparaît, les élèves inscrits dessus sont désinscrits et prévenus.",
+    champs: [
+      { id: "heures", label: "Heures de passage", aide: "Par exemple 8h, 8h30, 9h", valeur: s.creneaux.map(function (c) { return hc(c.debut); }).join(", ") },
+      { id: "duree", label: "Durée d'une colle, en minutes", type: "number", valeur: s.duree, attrs: ATTR_DUREE },
+      { id: "places", label: "Élèves par créneau", type: "number", valeur: s.places, attrs: ATTR_PLACES },
+      { id: "colleur", label: "Colleur", aide: "Facultatif", valeur: s.colleur },
+      { id: "salle", label: "Salle", aide: "Facultatif", valeur: s.salle }
+    ],
+    envoyer: function (v) { v.source = s.source; v.date = s.date; return opGestion("seance_modif", v, "Séance modifiée"); }
+  });
+  if (s.modifiee) ajouterBouton("Comme d'habitude", false, function () {
+    feuilleConfirmer("Remettre la séance comme d'habitude ?", '<p class="note" style="font-size:14px">Horaires, durée, places, colleur et salle reprennent leurs valeurs habituelles. Les élèves inscrits sur un horaire qui disparaît sont désinscrits et prévenus.</p>',
+      "Remettre comme d'habitude", false, function () { return opGestion("seance_modif", { source: s.source, date: s.date, retablir: true }, "Séance remise comme d'habitude"); });
+  });
+}
+function formDetail(m, w) {
+  feuilleFormulaire({
+    titre: "Colle " + w.num + " de " + m.nom + (S.g.classes.length > 1 ? ", " + nomClasse(m.classe) : ""),
+    intro: "Visible par les élèves sur la page de la colle et au moment de réserver.",
+    champs: [{ id: "texte", label: "Programme et consignes", aide: "Chapitres à réviser, déroulement, documents autorisés…", type: "textarea", valeur: w.detail,
+      placeholder: "Chapitres 3 et 4.\nQuestion de cours, puis un exercice.", attrs: ' maxlength="2000"' }],
+    envoyer: function (v) { return opGestion("detail", { matiere: m.id, lundi: w.lundi, texte: v.texte }, v.texte ? "Programme enregistré" : "Programme effacé"); }
+  });
 }
 function formMatiere(id) {
   var g = S.g, m = id ? g.matieres.filter(function (x) { return x.id === id; })[0] : { classe: g.classes[0] && g.classes[0].id, couleur: "#7a3fd1", duree: 40, places: 2 };
@@ -2134,7 +2612,7 @@ function formMatiere(id) {
       { id: "places", label: "Élèves par créneau", type: "number", valeur: m.places, attrs: ' inputmode="numeric" min="1" max="10"' },
       { id: "info", label: "Précision pour les élèves", aide: "Facultatif", valeur: m.info, placeholder: "20 min de préparation, puis 20 min de passage" },
       { id: "couleur", label: "Couleur", type: "color", valeur: m.couleur },
-      { id: "code", label: "Code de gestion", aide: "À donner au professeur ou au délégué qui gère cette matière.", valeur: m.code }
+      { id: "code", label: "Code de gestion pour cette classe", aide: "En général, le même dans toutes les classes : à régler dans « Codes des professeurs ».", valeur: m.code }
     ],
     envoyer: function (v) { v.id = id || ""; return opGestion("matiere", v, "Matière enregistrée"); }
   });
@@ -2187,6 +2665,7 @@ function rendre() {
   var hash = location.hash.replace("#", "");
   try { hash = decodeURIComponent(hash); } catch (e) { hash = ""; }
   if (hash === "gestion") vueGestion();
+  else if (!profilComplet() && !hash && LS.get(CLE_PROF)) { location.hash = "gestion"; return; }
   else if (!profilComplet()) vueArrivee();
   else if (hash.indexOf("v~") === 0) { var v = hash.split("~"); vueConsultation(v[1], v[2], v[3]); }
   else if (hash.indexOf("m-") === 0) vueMatiere(hash.slice(2));
@@ -2194,6 +2673,7 @@ function rendre() {
   else vueAccueil();
   majTete();
   ajusterSelect($("#sel-gm"));
+  ajusterSelect($("#sel-gc"));
   if (idActif && !$("#calques").innerHTML) {
     var el = document.getElementById(idActif);
     if (el && el !== actif && el.tagName === "INPUT") {
@@ -2235,8 +2715,10 @@ document.addEventListener("click", function (ev) {
     case "nom": api({ action: "etat", classe: S.ob.classe.id, code: S.ob.code, eleve: d.nom }).then(function (r) {
       if (!r.ok || !r.moi) { toast(r.ok ? "Nom introuvable dans la liste." : r.error, false); return; }
       S.ob.eleve = d.nom; S.ob.aCode = !!r.moi.aCode; S.ob.etape = "pin"; rendre(); }); break;
+    case "ob-profs": choisirProfs(); break;
+    case "prof-nom": S.ob.prof = d.nom; S.ob.etape = "prof-code"; rendre(); break;
     case "ob-retour":
-      S.ob.etape = { nom: "classe", pin: "nom" }[S.ob.etape] || "classe";
+      S.ob.etape = { nom: "classe", pin: "nom", "prof-nom": "classe", "prof-code": "prof-nom" }[S.ob.etape] || "classe";
       if (S.ob.etape === "nom" && !S.ob.eleves) S.ob.etape = "classe";
       rendre(); break;
     case "aller":
@@ -2253,7 +2735,7 @@ document.addEventListener("click", function (ev) {
     case "demo-reset": LS.del(CLE_DEMO); demo = null; S.etat = null; S.g = null; S.vue = null; S.annuaire = null; S.etatErreur = ""; toast("Démonstration réinitialisée"); rendre(); break;
     case "maj-gestion": S.maj = true; S.gErreurReseau = ""; rendre(); chargerGestion(); break;
     case "g-deco":
-      SS.set("colloscope-gestion", ""); S.g = null; S.gErreur = ""; S.gErreurReseau = "";
+      SS.set("colloscope-gestion", ""); LS.del(CLE_PROF); S.g = null; S.gErreur = ""; S.gErreurReseau = "";
       if (!profilComplet()) S.ob = debutConnexion();   // la liste des élèves a pu changer pendant la gestion
       S.etat = null; S.annuaire = null; S.vue = null;
       location.hash = ""; break;
@@ -2273,6 +2755,28 @@ document.addEventListener("click", function (ev) {
         return opGestion("desinscrire", { creneau: d.c, eleve: d.n }, "Élève retiré");
       }); break;
     case "g-regle": formRegle(d.id); break;
+    case "g-params": var mp = S.g.matieres.filter(function (x) { return x.id === S.gm; })[0]; if (mp) formParams(mp); break;
+    case "g-detail":
+      var md = S.g.matieres.filter(function (x) { return x.id === S.gm; })[0], wd = md && md.semaines.filter(function (x) { return x.lundi === d.l; })[0];
+      if (wd) formDetail(md, wd); break;
+    case "g-modif":
+      var mm = S.g.matieres.filter(function (x) { return x.id === S.gm; })[0], sm = null;
+      if (mm) mm.semaines.forEach(function (x) { x.seances.forEach(function (y) { if (y.source === d.src && y.date === d.date) sm = y; }); });
+      if (sm && sm.type === "ponctuel") formPonctuel(sm.source);
+      else if (sm) formModifSeance(mm, sm);
+      break;
+    case "a-code": formCodeMatiere(d.nom); break;
+    case "a-profs": formProfs(); break;
+    case "a-prof-code":
+      feuilleConfirmer("Nouveau code pour " + d.n + " ?", '<p class="note" style="font-size:14px">L\'ancien code ne marchera plus, y compris sur les appareils où il était enregistré. Pense à donner le nouveau.</p>',
+        "Créer un nouveau code", false, function () { return opGestion("prof_code", { nom: d.n }, "Nouveau code créé"); });
+      break;
+    case "a-unifier":
+      ouvrirFeuille('<h3>Un seul code par matière</h3><p class="note" style="font-size:14px">Chaque matière gardera, dans toutes les classes, le code qu\'elle a dans la classe choisie. Chaque prof n\'aura plus qu\'un code. Les autres codes ne marcheront plus.</p>' +
+        '<div class="pied-feuille">' + S.g.classes.map(function (c) { return '<button class="btn plein" data-act="a-unifier-ok" data-c="' + esc(c.id) + '">Garder les codes de ' + esc(c.nom) + '</button>'; }).join("") +
+        '<button class="btn plein discret" data-act="fermer">Annuler</button></div>', "Un seul code par matière");
+      break;
+    case "a-unifier-ok": opGestion("codes_unifier", { classe: d.c }, "Un code par matière"); break;
     case "g-ponctuel": formPonctuel(d.id); break;
     case "a-matiere": formMatiere(d.id); break;
     case "a-classe": formClasse(d.id); break;
