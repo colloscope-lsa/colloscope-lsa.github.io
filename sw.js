@@ -1,9 +1,9 @@
-/* Colloscope — service worker : démarrage immédiat et notifications. Version 8686f9515be1
+/* Colloscope — service worker : démarrage immédiat et notifications. Version b8730c67d101
    - La page et les icônes de cette version sont gardées sur le téléphone : le site s'ouvre sans attendre le réseau.
    - À chaque ouverture, la page est aussi redemandée au serveur en arrière-plan : si elle a changé, le site propose de recharger.
    - Les données (créneaux, inscriptions) ne passent jamais par ici : elles viennent toujours du serveur. */
 "use strict";
-var VERSION = "8686f9515be1";
+var VERSION = "b8730c67d101";
 var CACHE = "colloscope-" + VERSION, POLICES = "colloscope-polices";
 var FICHIERS = ["./", "manifest.webmanifest", "apple-touch-icon.png", "icone-192.png"];
 
